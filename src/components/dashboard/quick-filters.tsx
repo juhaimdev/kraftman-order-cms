@@ -8,10 +8,15 @@ import {
   Package,
   RefreshCw,
   Search,
+  Wallet,
   X,
 } from "lucide-react";
-import type { DashboardCounts, ProductPreset } from "@/lib/db/types";
-import { cn } from "@/lib/utils";
+import type {
+  DashboardCounts,
+  ProductPreset,
+  WalletSummary,
+} from "@/lib/db/types";
+import { cn, formatWalletINR } from "@/lib/utils";
 import { AddOrderDialog } from "@/components/shared/add-order-dialog";
 import { ImportDelhiveryDialog } from "@/components/shared/import-delhivery-dialog";
 import { ProductsDialog } from "@/components/shared/products-dialog";
@@ -25,6 +30,7 @@ interface QuickFiltersProps {
   searchQuery: string;
   counts: DashboardCounts;
   products: ProductPreset[];
+  wallet?: WalletSummary | null;
   exportUrl: string;
   syncAllPending?: boolean;
   trackAllPending?: boolean;
@@ -39,6 +45,7 @@ export function QuickFilters({
   searchQuery,
   counts,
   products,
+  wallet,
   exportUrl,
   syncAllPending = false,
   trackAllPending = false,
@@ -54,30 +61,69 @@ export function QuickFilters({
     { key: "ndr", label: "NDR / Failed", count: counts.ndr },
   ];
 
+  const isLowBalance = wallet != null && wallet.current_balance < 200;
+
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md">
-      <div className="mx-auto max-w-7xl px-3 pt-3 pb-2.5 sm:px-6 space-y-2.5">
-        {/* Top Row: Brand + Search + Quick Tools */}
+    <header className="sticky top-0 z-30 border-t-[3px] border-t-[#D9232A] border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-2xs">
+      <div className="mx-auto max-w-7xl px-3 pt-2.5 pb-2.5 sm:px-6 space-y-2.5">
+        {/* Top Row: Delhivery One Brand + Wallet Pill + Search + Quick Tools */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-950 via-slate-900 to-[#D9232A] text-white shadow-sm">
               <Package className="h-5 w-5" />
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#D9232A]" />
             </div>
             <div className="hidden lg:block">
-              <h1 className="text-sm font-bold leading-tight text-slate-900">
-                Delhivery One
-              </h1>
-              <p className="text-[11px] text-slate-500">Dispatch Command</p>
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-sm font-extrabold tracking-tight text-slate-950">
+                  KRAFTMAN
+                </h1>
+                <span className="rounded bg-[#D9232A] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                  DELHIVERY ONE
+                </span>
+              </div>
+              <p className="text-[11px] font-medium text-slate-500">
+                Order & Shipping Command Center
+              </p>
             </div>
           </div>
 
-          <div className="relative flex-1 min-w-[160px]">
+          {/* Live Wallet Balance Pill */}
+          {wallet && (
+            <button
+              type="button"
+              onClick={onSyncAll}
+              disabled={syncAllPending}
+              title={`Delhivery One Wallet (${wallet.is_active ? "Active" : "Inactive"}${wallet.payment_gateway ? ` · ${wallet.payment_gateway}` : ""}). Click to refresh.`}
+              className={cn(
+                "inline-flex min-h-10 sm:min-h-9 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold transition-colors cursor-pointer",
+                isLowBalance
+                  ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                  : "border-emerald-200 bg-emerald-50/90 text-emerald-900 hover:bg-emerald-100"
+              )}
+            >
+              <Wallet
+                className={cn(
+                  "h-3.5 w-3.5",
+                  isLowBalance ? "text-amber-600" : "text-emerald-600"
+                )}
+              />
+              <span className="hidden sm:inline text-[11px] font-medium opacity-80">
+                Wallet
+              </span>
+              <span className="font-mono font-bold">
+                {formatWalletINR(wallet.current_balance)}
+              </span>
+            </button>
+          )}
+
+          <div className="relative flex-1 min-w-[150px]">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search Order #, AWB, Customer, PIN..."
-              className="pl-9 pr-9 bg-slate-50 border-slate-200 focus-visible:bg-white"
+              className="pl-9 pr-9 bg-slate-50/90 border-slate-200 focus-visible:bg-white"
               aria-label="Search orders"
             />
             {searchQuery && (
@@ -106,9 +152,9 @@ export function QuickFilters({
                 title="Refresh live tracking across all shipped orders"
               >
                 {trackAllPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  <Loader2 className="h-4 w-4 animate-spin text-[#D9232A]" />
                 ) : (
-                  <MapPin className="h-4 w-4 text-blue-600" />
+                  <MapPin className="h-4 w-4 text-[#D9232A]" />
                 )}
                 <span className="hidden sm:inline">Track All</span>
               </Button>
@@ -133,7 +179,7 @@ export function QuickFilters({
                 onClick={onSyncAll}
                 disabled={syncAllPending}
                 aria-label="Sync from Delhivery One"
-                title="Sync live orders & tracking from Delhivery One"
+                title="Sync wallet, orders & live tracking from Delhivery One"
               >
                 {syncAllPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -160,10 +206,10 @@ export function QuickFilters({
                 type="button"
                 onClick={() => onFilterChange(pill.key)}
                 className={cn(
-                  "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 text-xs font-semibold transition-colors cursor-pointer",
+                  "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 text-xs font-semibold transition-all cursor-pointer",
                   isActive
-                    ? "border-slate-900 bg-slate-900 text-white shadow-2xs"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    ? "border-slate-950 bg-slate-950 text-white shadow-xs"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                 )}
               >
                 <span>{pill.label}</span>
@@ -171,7 +217,7 @@ export function QuickFilters({
                   className={cn(
                     "rounded-full px-1.5 py-0.5 text-[10px] font-mono",
                     isActive
-                      ? "bg-white/20 text-white"
+                      ? "bg-[#D9232A] text-white"
                       : "bg-slate-100 text-slate-600"
                   )}
                 >

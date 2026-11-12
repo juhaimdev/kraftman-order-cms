@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Delhivery One · Order & Shipping Dashboard",
+  title: "Kraftman · Delhivery One Shipping Command Center",
   description:
-    "Mobile-first order management & shipping command center powered by Delhivery One API on Vercel & Supabase.",
+    "Kraftman order management, tracking & shipping command center powered by Delhivery One API on Vercel & Supabase.",
 };
 
 export const viewport: Viewport = {

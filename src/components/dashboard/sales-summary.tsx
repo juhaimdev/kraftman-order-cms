@@ -10,8 +10,12 @@ import {
   MapPin,
   Wallet,
 } from "lucide-react";
-import type { OrderWithShipment, SalesSummary } from "@/lib/db/types";
-import { cn, formatINR } from "@/lib/utils";
+import type {
+  OrderWithShipment,
+  SalesSummary,
+  WalletSummary,
+} from "@/lib/db/types";
+import { cn, formatINR, formatWalletINR } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +29,7 @@ import type { FilterKey } from "./quick-filters";
 
 interface SalesSummarySectionProps {
   sales: SalesSummary;
+  wallet?: WalletSummary | null;
   visibleOrders: OrderWithShipment[];
   isFiltered: boolean;
   onSelectFilter: (filter: FilterKey) => void;
@@ -37,6 +42,7 @@ function pct(part: number, total: number): number {
 
 export function SalesSummarySection({
   sales,
+  wallet,
   visibleOrders,
   isFiltered,
   onSelectFilter,
@@ -244,13 +250,45 @@ export function SalesSummarySection({
         </Dialog>
       </div>
 
-      {/* Responsive KPI Cards: 2x2 on Mobile, 4-col on md+ */}
-      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-        {/* Card 1: Total Sales */}
-        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
+      {/* Responsive KPI Cards: Delhivery Wallet + Sales Metrics */}
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-5">
+        {/* Featured Card 1: Delhivery One Wallet Balance */}
+        <div className="col-span-2 md:col-span-1 rounded-2xl border border-slate-900 bg-gradient-to-br from-slate-950 via-slate-900 to-[#5b1015] p-3.5 text-white shadow-sm">
+          <div className="flex items-center justify-between text-xs font-medium text-slate-300">
+            <span>Delhivery Wallet</span>
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white/10">
+              <CreditCard className="h-3.5 w-3.5 text-[#ff6b72]" />
+            </span>
+          </div>
+          <p className="mt-1 font-mono text-xl font-bold tracking-tight text-white">
+            {wallet ? formatWalletINR(wallet.current_balance) : "—"}
+          </p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-300">
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                wallet
+                  ? wallet.current_balance < 200
+                    ? "bg-amber-400"
+                    : "bg-emerald-400"
+                  : "bg-slate-500"
+              )}
+            />
+            <span>
+              {wallet
+                ? `${wallet.is_active ? "Active" : "Paused"}${wallet.payment_gateway ? ` · ${wallet.payment_gateway}` : ""}`
+                : "Tap Sync to load balance"}
+            </span>
+          </p>
+        </div>
+
+        {/* Card 2: Total Sales */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
           <div className="flex items-center justify-between text-xs font-medium text-slate-500">
             <span>Total Sales</span>
-            <IndianRupee className="h-3.5 w-3.5 text-slate-400" />
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100">
+              <IndianRupee className="h-3.5 w-3.5 text-slate-700" />
+            </span>
           </div>
           <p className="mt-1 font-mono text-lg font-bold tracking-tight text-slate-900">
             {formatINR(sales.total_revenue)}
@@ -260,11 +298,13 @@ export function SalesSummarySection({
           </p>
         </div>
 
-        {/* Card 2: COD vs Prepaid */}
-        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
+        {/* Card 3: COD vs Prepaid */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
           <div className="flex items-center justify-between text-xs font-medium text-slate-500">
             <span>COD / Prepaid</span>
-            <Wallet className="h-3.5 w-3.5 text-amber-500" />
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-amber-50">
+              <Wallet className="h-3.5 w-3.5 text-amber-600" />
+            </span>
           </div>
           <p className="mt-1 font-mono text-lg font-bold tracking-tight text-slate-900">
             {formatINR(sales.cod_revenue)}
@@ -280,11 +320,13 @@ export function SalesSummarySection({
           </div>
         </div>
 
-        {/* Card 3: Delivered Revenue */}
-        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
+        {/* Card 4: Delivered Revenue */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
           <div className="flex items-center justify-between text-xs font-medium text-slate-500">
             <span>Delivered</span>
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+            </span>
           </div>
           <p className="mt-1 font-mono text-lg font-bold tracking-tight text-emerald-700">
             {formatINR(sales.delivered_revenue)}
@@ -294,17 +336,19 @@ export function SalesSummarySection({
           </p>
         </div>
 
-        {/* Card 4: NDR At Risk (clickable shortcut to NDR filter) */}
+        {/* Card 5: NDR At Risk (clickable shortcut to NDR filter) */}
         <button
           type="button"
           onClick={() => onSelectFilter("ndr")}
-          className="min-h-11 rounded-xl border border-red-200/80 bg-white p-3.5 text-left shadow-2xs transition-colors hover:bg-red-50/40 cursor-pointer"
+          className="min-h-11 rounded-2xl border border-red-200/90 bg-gradient-to-br from-white to-red-50/40 p-3.5 text-left shadow-2xs transition-colors hover:bg-red-50/70 cursor-pointer"
         >
-          <div className="flex items-center justify-between text-xs font-medium text-red-700">
+          <div className="flex items-center justify-between text-xs font-medium text-[#D9232A]">
             <span>NDR At Risk</span>
-            <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-red-100/70">
+              <AlertTriangle className="h-3.5 w-3.5 text-[#D9232A]" />
+            </span>
           </div>
-          <p className="mt-1 font-mono text-lg font-bold tracking-tight text-red-700">
+          <p className="mt-1 font-mono text-lg font-bold tracking-tight text-[#D9232A]">
             {formatINR(sales.ndr_revenue)}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">

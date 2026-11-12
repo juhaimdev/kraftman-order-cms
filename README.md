@@ -1,6 +1,6 @@
-# Delhivery One · Order Management & Shipping Command Center
+# Kraftman · Delhivery One Order & Shipping Command Center
 
-A mobile-first, dual-pane Next.js 16 (App Router) shipping & dispatch command center built for **Vercel** and **Supabase PostgreSQL**, integrated with the **Delhivery One API**.
+A mobile-first, dual-pane Next.js 16 (App Router) **Kraftman** order management, fulfillment & dispatch command center built for **Vercel** and **Supabase PostgreSQL**, integrated with the **Delhivery One API**.
 
 ## Key Capabilities
 

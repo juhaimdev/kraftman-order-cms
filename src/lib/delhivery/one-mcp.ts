@@ -1,5 +1,6 @@
 import "server-only";
 import { cacheGet, cachePut } from "../cache";
+import type { WalletSummary } from "../db/types";
 
 interface DelhiveryMcpConfig {
   clientId: string;
@@ -122,6 +123,48 @@ export async function callDelhiveryOneMcpTool<T = Record<string, unknown>>(
     return JSON.parse(innerText) as T;
   } catch {
     throw new Error(innerText.slice(0, 200));
+  }
+}
+
+/**
+ * Fetches live Delhivery One prepaid wallet balance with a 90s warm cache
+ * so dashboard page loads remain fast while staying near real-time.
+ */
+export async function getWalletDetailsCached(
+  forceRefresh = false
+): Promise<WalletSummary | null> {
+  const cfg = await getMcpConfig();
+  if (!cfg) return null;
+
+  const cacheKey = `d1mcp:wallet:${cfg.realm}`;
+  if (!forceRefresh) {
+    const hit = await cacheGet<WalletSummary>(cacheKey);
+    if (hit) return { ...hit, cached: true };
+  }
+
+  try {
+    const res = await callDelhiveryOneMcpTool<{
+      current_balance?: number;
+      minimum_threshold?: number;
+      maximum_threshold?: number;
+      is_active?: boolean;
+      payment_gateway?: string;
+    }>("get-wallet-details", {});
+
+    if (typeof res?.current_balance !== "number") return null;
+
+    const summary: WalletSummary = {
+      current_balance: res.current_balance,
+      minimum_threshold: Number(res.minimum_threshold ?? 0),
+      maximum_threshold: Number(res.maximum_threshold ?? 0),
+      is_active: Boolean(res.is_active ?? true),
+      payment_gateway: res.payment_gateway,
+      cached: false,
+    };
+    await cachePut(cacheKey, summary, 90);
+    return summary;
+  } catch {
+    return null;
   }
 }
 

@@ -1,7 +1,6 @@
 /**
- * Lightweight zero-dependency 4x6 inch (288 x 432 pt) thermal PDF generator.
- * Used as a fallback when Delhivery `/api/p/packing_slip` returns JSON metadata
- * instead of direct PDF bytes.
+ * Zero-dependency 4x6 inch (288 x 432 pt) thermal PDF generator styled after
+ * the default Delhivery Express 4x6 shipping label theme.
  */
 
 export interface ThermalLabelData {
@@ -16,6 +15,9 @@ export interface ThermalLabelData {
   paymentMode: string;
   codAmount: string;
   weightGrams: string;
+  dimensions?: string;
+  itemDescription?: string;
+  pickupWarehouse?: string;
   sortCode?: string;
 }
 
@@ -45,15 +47,20 @@ function wrapText(text: string, maxChars: number): string[] {
   return lines;
 }
 
-/** Generate simple deterministic bar pattern for visual AWB scanning fallback */
-function drawVisualBarcode(awb: string, x: number, y: number, width: number, height: number): string {
+/** Generate clean deterministic barcode stripes for 4x6 label scanning */
+function drawVisualBarcode(
+  awb: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): string {
   const ops: string[] = [];
   const chars = awb.split("");
   const totalUnits = chars.length * 6 + 4;
   const unitW = width / totalUnits;
   let cursor = x;
 
-  // Start guard bars
   ops.push(`${cursor.toFixed(2)} ${y} ${(unitW * 1.5).toFixed(2)} ${height} re f`);
   cursor += unitW * 2.5;
 
@@ -61,88 +68,153 @@ function drawVisualBarcode(awb: string, x: number, y: number, width: number, hei
     const code = chars[i].charCodeAt(0);
     for (let b = 0; b < 3; b++) {
       const bit = (code >> b) & 1;
-      const barW = bit ? unitW * 1.4 : unitW * 0.7;
+      const barW = bit ? unitW * 1.45 : unitW * 0.72;
       ops.push(`${cursor.toFixed(2)} ${y} ${barW.toFixed(2)} ${height} re f`);
       cursor += unitW * 2;
     }
   }
 
-  // Stop guard bar
   ops.push(`${cursor.toFixed(2)} ${y} ${(unitW * 1.5).toFixed(2)} ${height} re f`);
   return ops.join("\n");
 }
 
 function buildPageStream(label: ThermalLabelData): string {
   const lines: string[] = [];
-  // 4x6 inch page: 288 x 432 points
-  // Outer border
-  lines.push("1 w 0 0 0 RG 10 10 268 412 re S");
-  // Header divider
-  lines.push("10 374 m 278 374 l S");
-  // Barcode divider
-  lines.push("10 278 m 278 278 l S");
-  // Payment divider
-  lines.push("10 218 m 278 218 l S");
-  // Footer divider
-  lines.push("10 64 m 278 64 l S");
+  const isCod = label.paymentMode.toUpperCase() === "COD";
+  const routingCode =
+    label.sortCode ||
+    (label.pincode && label.pincode !== "000000"
+      ? `IN-${label.pincode.slice(0, 3)}`
+      : "DEL-STD");
 
-  // Header text
-  lines.push("BT /F2 14 Tf 20 395 Td (DELHIVERY EXPRESS) Tj ET");
-  if (label.sortCode) {
-    lines.push(`BT /F2 12 Tf 200 395 Td (${escapePdfText(label.sortCode)}) Tj ET`);
-  }
-  lines.push(`BT /F1 9 Tf 20 381 Td (4x6 Thermal Packing Slip) Tj ET`);
+  // Outer card border (288 x 432 pt)
+  lines.push("1.1 w 0.08 0.09 0.12 RG 10 10 268 412 re S");
 
-  // Barcode block
+  // Default Delhivery Theme Header: Deep Charcoal Bar + Delhivery Crimson Accent Strip
+  lines.push("0.07 0.09 0.13 rg 10 382 268 40 re f");
+  lines.push("0.85 0.13 0.17 rg 10 377 268 5 re f");
+
+  // DELHIVERY Wordmark & Routing Pill
+  lines.push("1 1 1 rg");
+  lines.push("BT /F2 15 Tf 18 400 Td (DELHIVERY) Tj ET");
+  lines.push("0.85 0.13 0.17 rg 104 401 38 12 re f");
+  lines.push("1 1 1 rg");
+  lines.push("BT /F2 7 Tf 109 404.5 Td (ONE) Tj ET");
+  lines.push("0.82 0.85 0.90 rg");
+  lines.push("BT /F1 7.5 Tf 18 388 Td (EXPRESS PARCEL · DEFAULT 4x6 LABEL) Tj ET");
+
+  // Routing / Sort Code Badge (top right)
+  lines.push("1 1 1 rg 206 388 64 26 re f");
+  lines.push("0.07 0.09 0.13 rg");
+  lines.push(`BT /F2 10.5 Tf 214 398 Td (${escapePdfText(routingCode)}) Tj ET`);
+
+  // Horizontal section dividers
+  lines.push("0.75 0.78 0.82 RG 0.7 w");
+  lines.push("10 282 m 278 282 l S");
+  lines.push("10 230 m 278 230 l S");
+  lines.push("10 92 m 278 92 l S");
+  lines.push("10 54 m 278 54 l S");
+
+  // AWB Barcode Block
   lines.push("0 0 0 rg");
-  lines.push(drawVisualBarcode(label.awb, 24, 312, 240, 48));
-  lines.push(`BT /F2 12 Tf 72 292 Td (AWB: ${escapePdfText(label.awb)}) Tj ET`);
+  lines.push(drawVisualBarcode(label.awb, 26, 314, 236, 48));
+  lines.push(`BT /F2 11.5 Tf 66 297 Td (AWB# ${escapePdfText(label.awb)}) Tj ET`);
+  lines.push(`BT /F1 8 Tf 18 287 Td (Order: ${escapePdfText(label.orderNumber)}) Tj ET`);
 
-  // Payment & Weight block
-  const payBadge = label.paymentMode.toUpperCase() === "COD"
-    ? `COD - COLLECT Rs. ${label.codAmount}`
-    : "PREPAID - DO NOT COLLECT CASH";
-  lines.push(`BT /F2 11 Tf 20 256 Td (${escapePdfText(payBadge)}) Tj ET`);
-  lines.push(`BT /F1 10 Tf 20 236 Td (Order: ${escapePdfText(label.orderNumber)}   Weight: ${escapePdfText(label.weightGrams)}g) Tj ET`);
-
-  // Deliver To block
-  lines.push("BT /F2 10 Tf 20 198 Td (DELIVER TO:) Tj ET");
-  lines.push(`BT /F2 11 Tf 20 182 Td (${escapePdfText(label.customerName)}) Tj ET`);
-  lines.push(`BT /F1 10 Tf 20 166 Td (Phone: ${escapePdfText(label.phone)}) Tj ET`);
-
-  const addressLines = wrapText(label.address, 42).slice(0, 3);
-  let y = 148;
-  for (const addrLine of addressLines) {
-    lines.push(`BT /F1 9.5 Tf 20 ${y} Td (${escapePdfText(addrLine)}) Tj ET`);
-    y -= 13;
+  // Payment Banner (Delhivery Crimson for COD, Slate for Prepaid)
+  if (isCod) {
+    lines.push("0.85 0.13 0.17 rg 16 254 256 22 re f");
+    lines.push("1 1 1 rg");
+    lines.push(
+      `BT /F2 10.5 Tf 24 261 Td (${escapePdfText(`COD · COLLECT Rs. ${label.codAmount}`)}) Tj ET`
+    );
+  } else {
+    lines.push("0.12 0.16 0.23 rg 16 254 256 22 re f");
+    lines.push("1 1 1 rg");
+    lines.push("BT /F2 10 Tf 24 261 Td (PREPAID · DO NOT COLLECT CASH) Tj ET");
   }
-  const cityState = `${label.city}, ${label.state} - ${label.pincode}`.trim();
-  lines.push(`BT /F2 11 Tf 20 ${Math.min(y - 2, 102)} Td (${escapePdfText(cityState)}) Tj ET`);
 
-  // Footer
-  lines.push("BT /F1 8 Tf 20 44 Td (Powered by Delhivery One Shipping Dashboard) Tj ET");
-  lines.push(`BT /F1 8 Tf 20 30 Td (Track: delhivery.com/track/package/${escapePdfText(label.awb)}) Tj ET`);
+  // Weight, Dimensions & Item Info Row
+  lines.push("0.15 0.18 0.24 rg");
+  const specLine = [
+    `Wt: ${label.weightGrams}g`,
+    label.dimensions ? `Dim: ${label.dimensions} cm` : null,
+  ]
+    .filter(Boolean)
+    .join("   |   ");
+  lines.push(`BT /F2 8.5 Tf 18 239 Td (${escapePdfText(specLine)}) Tj ET`);
+
+  // DELIVER TO (Consignee Box)
+  lines.push("0.85 0.13 0.17 rg");
+  lines.push("BT /F2 8.5 Tf 18 216 Td (DELIVER TO:) Tj ET");
+  lines.push("0.07 0.09 0.13 rg");
+  lines.push(`BT /F2 11 Tf 18 201 Td (${escapePdfText(label.customerName)}) Tj ET`);
+  lines.push(`BT /F1 9 Tf 18 187 Td (Mob: ${escapePdfText(label.phone || "N/A")}) Tj ET`);
+
+  const addressLines = wrapText(label.address || "Address on file", 42).slice(0, 3);
+  let y = 171;
+  for (const addrLine of addressLines) {
+    lines.push(`BT /F1 9 Tf 18 ${y} Td (${escapePdfText(addrLine)}) Tj ET`);
+    y -= 12.5;
+  }
+
+  const cityState = [label.city, label.state].filter(Boolean).join(", ");
+  const pinStr = label.pincode ? `PIN: ${label.pincode}` : "";
+  lines.push(
+    `BT /F2 10.5 Tf 18 ${Math.min(y - 4, 118)} Td (${escapePdfText(`${cityState}${cityState ? " - " : ""}${pinStr}`)}) Tj ET`
+  );
+
+  if (label.itemDescription) {
+    lines.push("0.35 0.39 0.46 rg");
+    lines.push(
+      `BT /F1 8 Tf 18 100 Td (Item: ${escapePdfText(label.itemDescription.slice(0, 44))}) Tj ET`
+    );
+  }
+
+  // Pickup / Return Warehouse Block
+  lines.push("0.15 0.18 0.24 rg");
+  const warehouse = label.pickupWarehouse || "Kraftman Seller Warehouse";
+  lines.push(
+    `BT /F2 8 Tf 18 77 Td (RETURN / PICKUP FROM: KRAFTMAN) Tj ET`
+  );
+  lines.push(
+    `BT /F1 8.5 Tf 18 65 Td (${escapePdfText(warehouse)}) Tj ET`
+  );
+
+  // Official Delhivery Footer
+  lines.push("0.96 0.97 0.98 rg 11 11 266 42 re f");
+  lines.push("0.28 0.33 0.40 rg");
+  lines.push(
+    `BT /F1 7.5 Tf 18 39 Td (Track: delhivery.com/track-v2/package/${escapePdfText(label.awb)}) Tj ET`
+  );
+  lines.push(
+    "BT /F1 7 Tf 18 26 Td (Kraftman x Delhivery Express Packing Slip · Handle With Care) Tj ET"
+  );
 
   return lines.join("\n");
 }
 
 export function buildThermalLabelsPdf(labels: ThermalLabelData[]): Uint8Array {
-  const safeLabels = labels.length > 0 ? labels : [{
-    awb: "000000000000",
-    orderNumber: "N/A",
-    customerName: "Unknown",
-    phone: "",
-    address: "",
-    city: "",
-    state: "",
-    pincode: "",
-    paymentMode: "Prepaid",
-    codAmount: "0",
-    weightGrams: "500",
-  }];
+  const safeLabels: ThermalLabelData[] =
+    labels.length > 0
+      ? labels
+      : [
+          {
+            awb: "000000000000",
+            orderNumber: "N/A",
+            customerName: "Unknown",
+            phone: "",
+            address: "",
+            city: "",
+            state: "",
+            pincode: "",
+            paymentMode: "Prepaid",
+            codAmount: "0",
+            weightGrams: "500",
+          },
+        ];
 
   const objects: string[] = [];
-  // 1: Catalog, 2: Pages, 3: Font F1 (Helvetica), 4: Font F2 (Helvetica-Bold)
   const pageObjIds: number[] = [];
   let nextId = 5;
 
@@ -183,4 +255,3 @@ export function buildThermalLabelsPdf(labels: ThermalLabelData[]): Uint8Array {
 
   return new TextEncoder().encode(pdf);
 }
-

@@ -109,8 +109,49 @@ export const productPresetSchema = z.object({
   default_price: z.coerce.number().min(0, "Price cannot be negative").default(0),
 });
 
+export const updateOrderSchema = z.object({
+  order_id: z.string().uuid("Valid order ID required"),
+  customer_name: z.string().trim().min(2, "Customer name is required"),
+  customer_phone: phoneSchema,
+  address: z.string().trim().min(5, "Street address is required"),
+  city: z.string().trim().min(2, "City is required"),
+  state: z.string().trim().min(2, "State is required"),
+  pincode: pincodeSchema,
+  payment_method: z.enum(["COD", "Prepaid"]),
+  total_amount: z.coerce.number().min(0, "Total amount cannot be negative"),
+  product_id: z.string().uuid().optional().or(z.literal("")),
+  item_description: z.string().trim().max(120).optional().or(z.literal("")),
+});
+
+export const rateCheckSchema = z.object({
+  origin_pin: pincodeSchema,
+  destination_pin: pincodeSchema,
+  weight_grams: weightSchema,
+  length_cm: z.coerce.number().min(1).max(200).default(20),
+  breadth_cm: z.coerce.number().min(1).max(200).default(15),
+  height_cm: z.coerce.number().min(1).max(200).default(10),
+  payment_method: z.enum(["COD", "Prepaid"]).default("Prepaid"),
+  cod_amount: z.coerce.number().min(0).default(0),
+  packaging_type: z.enum(["BOX", "FLYER", "CUSTOM"]).default("BOX"),
+  facility_id: z.string().optional(),
+});
+
+export const schedulePickupSchema = z.object({
+  facility_id: z.string().min(2, "Select a pickup warehouse"),
+  facility_code: z.string().optional(),
+  pincode: pincodeSchema.optional(),
+  pickup_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  start_time: z.string().min(4, "Start time required"),
+  end_time: z.string().min(4, "End time required"),
+  awb_numbers: z.array(z.string().trim().min(5)).min(1, "Select at least one AWB"),
+  expected_package_count: z.coerce.number().int().min(1).max(500),
+});
+
 export type CreateShipmentsInput = z.infer<typeof createShipmentsSchema>;
 export type NdrUpdateInput = z.infer<typeof ndrUpdateSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
 export type ProductPresetInput = z.infer<typeof productPresetSchema>;
+export type RateCheckInput = z.infer<typeof rateCheckSchema>;
+export type SchedulePickupInput = z.infer<typeof schedulePickupSchema>;
 

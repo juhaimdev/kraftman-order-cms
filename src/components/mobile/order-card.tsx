@@ -1,13 +1,25 @@
 "use client";
 
 import type { OrderWithShipment, ProductPreset } from "@/lib/db/types";
-import { cn, formatINR, getDelhiveryTrackingUrl } from "@/lib/utils";
+import {
+  cn,
+  deriveTransitInsights,
+  formatINR,
+  getDelhiveryTrackingUrl,
+} from "@/lib/utils";
 import { CallButton } from "@/components/shared/call-button";
 import { CopyButton } from "@/components/shared/copy-button";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { WhatsAppButton } from "@/components/shared/whatsapp-button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ExternalLink, Loader2, MapPin, Printer, Zap } from "lucide-react";
+import {
+  ExternalLink,
+  Loader2,
+  MapPin,
+  Navigation,
+  Printer,
+  Zap,
+} from "lucide-react";
 
 interface OrderCardProps {
   order: OrderWithShipment;
@@ -83,13 +95,42 @@ export function OrderCard({
         />
       </div>
 
-      {/* Middle Row: City & PIN */}
-      <div className="mt-2.5 flex items-center gap-1.5 text-xs text-slate-600">
-        <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-        <span className="truncate">
-          {order.city || order.address} ·{" "}
-          <strong className="font-mono text-slate-800">{order.pincode}</strong>
-        </span>
+      {/* Middle Row: City, PIN & Rich Tracking Info */}
+      <div className="mt-2.5 space-y-1.5">
+        <div className="flex items-center gap-1.5 text-xs text-slate-600">
+          <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <span className="truncate">
+            {order.city || order.address} ·{" "}
+            <strong className="font-mono text-slate-800">{order.pincode}</strong>
+          </span>
+        </div>
+
+        {order.awb_number && (() => {
+          const insights = deriveTransitInsights(
+            order.tracking_scans,
+            order.status,
+            order.latest_tracking_status
+          );
+          return (
+            <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-1.5 text-[11px] text-slate-600">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1 font-medium text-slate-800 truncate">
+                  <Navigation className="h-3 w-3 shrink-0 text-[#D9232A]" />
+                  <span className="truncate">{insights.currentLocation}</span>
+                </span>
+                <span className="shrink-0 font-mono text-[10px] text-slate-500">
+                  {insights.lastScanRelative || insights.lastScanTime}
+                  {insights.checkpointCount > 0 ? ` · ${insights.checkpointCount} scans` : ""}
+                </span>
+              </div>
+              {insights.latestInstruction && (
+                <p className="mt-0.5 truncate text-[10px] text-slate-500">
+                  {insights.latestInstruction}
+                </p>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Footer Quick Actions (All >= 44x44px) */}

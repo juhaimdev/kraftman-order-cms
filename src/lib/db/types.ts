@@ -15,6 +15,15 @@ export interface TrackingScan {
   ScannedLocation: string;
 }
 
+export interface WalletSummary {
+  current_balance: number;
+  minimum_threshold: number;
+  maximum_threshold: number;
+  is_active: boolean;
+  payment_gateway?: string;
+  cached?: boolean;
+}
+
 export interface ProductPreset {
   id: string;
   sku: string | null;

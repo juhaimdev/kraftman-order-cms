@@ -213,20 +213,25 @@ export function OrderDetailBody({
         />
       )}
 
-      {/* Tracking Timeline */}
+      {/* Tracking Timeline & Telemetry */}
       {order.awb_number && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Tracking Timeline
+              Live Tracking Intelligence
             </h4>
             {order.latest_tracking_status && (
-              <span className="text-xs font-medium text-slate-700">
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
                 {order.latest_tracking_status}
               </span>
             )}
           </div>
-          <TrackingTimeline scans={order.tracking_scans} />
+          <TrackingTimeline
+            scans={order.tracking_scans}
+            status={order.status}
+            latestTrackingStatus={order.latest_tracking_status}
+            isRto={order.is_rto}
+          />
         </div>
       )}
     </div>

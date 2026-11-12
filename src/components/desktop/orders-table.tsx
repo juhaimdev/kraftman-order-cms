@@ -1,9 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUpDown, ExternalLink, Loader2, Printer, Zap } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Loader2, Navigation, Printer, Zap } from "lucide-react";
 import type { OrderWithShipment, ProductPreset } from "@/lib/db/types";
-import { cn, formatDateTime, formatINR, getDelhiveryTrackingUrl } from "@/lib/utils";
+import {
+  cn,
+  deriveTransitInsights,
+  formatDateTime,
+  formatINR,
+  getDelhiveryTrackingUrl,
+} from "@/lib/utils";
 import { CallButton } from "@/components/shared/call-button";
 import { CopyButton } from "@/components/shared/copy-button";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -206,19 +212,37 @@ export function OrdersTable({
                     onClick={(e) => e.stopPropagation()}
                   >
                     {order.awb_number ? (
-                      <div className="space-y-1">
-                        <CopyButton
-                          value={order.awb_number}
-                          label={order.awb_number}
-                          toastText={`Copied AWB ${order.awb_number}`}
-                          className="min-h-8 h-8 px-2"
-                        />
-                        {order.latest_tracking_status && (
-                          <div className="max-w-[190px] truncate text-[11px] text-slate-500">
-                            {order.latest_tracking_status}
+                      (() => {
+                        const insights = deriveTransitInsights(
+                          order.tracking_scans,
+                          order.status,
+                          order.latest_tracking_status
+                        );
+                        return (
+                          <div className="space-y-1 max-w-[230px]">
+                            <CopyButton
+                              value={order.awb_number}
+                              label={order.awb_number}
+                              toastText={`Copied AWB ${order.awb_number}`}
+                              className="min-h-8 h-8 px-2"
+                            />
+                            {order.latest_tracking_status && (
+                              <div className="truncate text-[11px] font-medium text-slate-700">
+                                {order.latest_tracking_status}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                              <Navigation className="h-2.5 w-2.5 shrink-0 text-[#D9232A]" />
+                              <span className="truncate">{insights.currentLocation}</span>
+                              {insights.lastScanRelative && (
+                                <span className="shrink-0 font-mono text-slate-400">
+                                  · {insights.lastScanRelative}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
+                        );
+                      })()
                     ) : (
                       <span className="text-xs text-slate-400">Pending AWB</span>
                     )}
