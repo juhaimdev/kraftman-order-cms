@@ -1,0 +1,127 @@
+import "server-only";
+import { cacheGet, cachePut } from "../cache";
+
+interface DelhiveryMcpConfig {
+  clientId: string;
+  clientSecret: string;
+  authUrl: string;
+  realm: string;
+  clientCms: string;
+  mcpUrl: string;
+}
+
+export async function getMcpConfig(): Promise<DelhiveryMcpConfig | null> {
+  const clientId = process.env.D1_CLIENT_ID?.trim() || "";
+  const clientSecret = process.env.D1_CLIENT_SECRET?.trim() || "";
+  const authUrl = process.env.D1_AUTH_URL?.trim() || "";
+  const realm = process.env.D1_REALM?.trim() || "";
+  const clientCms = process.env.D1_CLIENT_CMS?.trim() || "";
+  const mcpUrl = process.env.D1_MCP_URL?.trim() || "";
+
+  if (!clientId || !clientSecret || !authUrl || !realm || !clientCms || !mcpUrl) {
+    return null;
+  }
+
+  return { clientId, clientSecret, authUrl, realm, clientCms, mcpUrl };
+}
+
+async function mintAccessToken(cfg: DelhiveryMcpConfig): Promise<string> {
+  const cacheKey = `d1mcp:token:${cfg.realm}`;
+  const cached = await cacheGet<{ access_token: string }>(cacheKey);
+  if (cached?.access_token) {
+    return cached.access_token;
+  }
+
+  const tokenUrl = `${cfg.authUrl.replace(/\/$/, "")}/realms/${cfg.realm}/protocol/openid-connect/token`;
+  const res = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: cfg.clientId,
+      client_secret: cfg.clientSecret,
+    }).toString(),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Delhivery One OAuth failed (${res.status} ${res.statusText})`);
+  }
+
+  const data = (await res.json()) as {
+    access_token?: string;
+    expires_in?: number;
+  };
+  if (!data.access_token) {
+    throw new Error("Delhivery One OAuth response missing access_token");
+  }
+
+  const ttl = Math.max(30, (data.expires_in ?? 300) - 30);
+  await cachePut(cacheKey, { access_token: data.access_token }, ttl);
+  return data.access_token;
+}
+
+export async function callDelhiveryOneMcpTool<T = Record<string, unknown>>(
+  name: string,
+  args: Record<string, unknown> = {}
+): Promise<T> {
+  const cfg = await getMcpConfig();
+  if (!cfg) {
+    throw new Error(
+      "Delhivery One MCP credentials (D1_CLIENT_ID / D1_CLIENT_SECRET / D1_MCP_URL) are not configured."
+    );
+  }
+
+  const token = await mintAccessToken(cfg);
+  const res = await fetch(cfg.mcpUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "x-hq-client-id": cfg.clientCms,
+      "X-UCP-User-Email": "--",
+      "X-UCP-Realm": cfg.realm,
+      "X-Request-ID": crypto.randomUUID(),
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name, arguments: args },
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(
+      `Delhivery One MCP error (${res.status}): ${errText.slice(0, 180)}`
+    );
+  }
+
+  const rawText = await res.text();
+  const dataLine = rawText
+    .split("\n")
+    .find((line) => line.startsWith("data: "));
+  const rpc = JSON.parse(dataLine ? dataLine.slice(6) : rawText) as {
+    result?: { content?: Array<{ text?: string }> };
+    error?: { message?: string };
+  };
+
+  if (rpc.error) {
+    throw new Error(rpc.error.message || `MCP tool ${name} failed`);
+  }
+
+  const innerText = rpc.result?.content?.[0]?.text;
+  if (!innerText) {
+    return (rpc.result ?? {}) as T;
+  }
+
+  try {
+    return JSON.parse(innerText) as T;
+  } catch {
+    throw new Error(innerText.slice(0, 200));
+  }
+}
+
