@@ -14,6 +14,7 @@ export function getDelhiveryTrackingUrl(awb: string): string {
 export function getWhatsAppDialNumber(phone?: string | null): string | null {
   if (!phone || /[x*]/i.test(phone)) return null;
   const digits = phone.replace(/\D/g, "");
+  if (!digits || /^0+$/.test(digits) || digits === "910000000000") return null;
   if (digits.length === 10) return `91${digits}`;
   if (digits.length === 12 && digits.startsWith("91")) return digits;
   if (digits.length >= 11 && digits.length <= 15) return digits;

@@ -3,7 +3,8 @@ export type OrderStatus =
   | "Manifested"
   | "In Transit"
   | "Delivered"
-  | "NDR";
+  | "NDR"
+  | "Cancelled";
 
 export type PaymentMethod = "COD" | "Prepaid";
 
@@ -122,4 +123,64 @@ export interface SalesSummary {
   in_transit_revenue: number;
   in_transit_count: number;
   top_cities: CitySalesItem[];
+}
+
+export interface PickupSlot {
+  start_time: string;
+  end_time: string;
+}
+
+export interface PickupLocationInfo {
+  facility_id: string;
+  facility_name: string;
+  facility_code: string | null;
+  status: string;
+  address_line: string;
+  city: string;
+  state: string;
+  pin_code: string;
+  phone: string;
+  preferred_slots: PickupSlot[];
+}
+
+export interface PickupRequestInfo {
+  pickup_id: string;
+  pickup_location_name: string;
+  pincode: string;
+  status: string;
+  pickup_start_time: string;
+  pickup_end_time: string;
+  expected_packages_count: number;
+  total_packages_count: number;
+  nsl_remark: string | null;
+}
+
+export interface ShippingRateQuote {
+  mode: "EXPRESS" | "SURFACE";
+  total_amount: number;
+  gross_amount: number;
+  freight_cost: number;
+  charged_cod: number;
+  dph_charge: number;
+  fuel_surcharge: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  zone: string;
+  charged_weight: number;
+  success: boolean;
+  message: string;
+}
+
+export interface DelhiveryExceptionItem {
+  exception_id: string;
+  awb: string;
+  bucket: string;
+  status: string;
+  reason: string;
+  cta_list: Array<{
+    actionable_id: string;
+    bucket_id: string;
+    label: string;
+  }>;
 }

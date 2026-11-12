@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
-import { getDelhiveryConfig } from "@/lib/delhivery/client";
-import { cancelShipmentApi, submitNdrActionApi } from "@/lib/delhivery/api";
+import { cancelShipment, submitNdrAction } from "@/lib/delhivery/client";
+import type { TrackingScan } from "@/lib/db/types";
 import {
   createOrderSchema,
   updateOrderSchema,
@@ -104,41 +104,39 @@ export async function updateOrderAction(input: UpdateOrderInput): Promise<{
 
   const { data: shipRow } = await supabase
     .from("shipments")
-    .select("awb")
+    .select("awb_number")
     .eq("order_id", data.order_id)
     .maybeSingle();
 
   let syncedToDelhivery = false;
-  if (shipRow?.awb) {
-    const cfg = getDelhiveryConfig();
-    if (!cfg) {
-      return {
-        error: "DELHIVERY_API_TOKEN is required to edit a manifested shipment.",
-      };
-    }
-
+  if (shipRow?.awb_number) {
     const fullAdd = `${data.address}, ${data.city}, ${data.state} - ${data.pincode}`;
-    const res = await submitNdrActionApi(
-      {
-        waybill: shipRow.awb,
+    try {
+      const res = await submitNdrAction({
+        waybill: shipRow.awb_number,
         act: "EDIT_DETAILS",
         name: data.customer_name,
         phone: data.customer_phone,
         add: fullAdd,
-      },
-      cfg.token,
-      cfg.env
-    );
+      });
 
-    if (res.success === false || res.error) {
+      if (res.success === false || res.error) {
+        return {
+          error:
+            typeof res.error === "string"
+              ? res.error
+              : res.message ?? "Delhivery rejected live consignee update.",
+        };
+      }
+      syncedToDelhivery = true;
+    } catch (err) {
       return {
         error:
-          typeof res.error === "string"
-            ? res.error
-            : res.message ?? "Delhivery rejected live consignee update.",
+          err instanceof Error
+            ? err.message
+            : "Failed to sync consignee edits to Delhivery.",
       };
     }
-    syncedToDelhivery = true;
   }
 
   const { error: updateErr } = await supabase
@@ -192,12 +190,12 @@ export async function cancelOrDeleteOrderAction(input: {
 
   const { data: shipRow } = await supabase
     .from("shipments")
-    .select("id, awb, scans_json")
+    .select("id, awb_number, tracking_scans")
     .eq("order_id", input.orderId)
     .maybeSingle();
 
   if (input.mode === "delete_draft") {
-    if (shipRow?.awb || orderRow.status !== "Unfulfilled") {
+    if (shipRow?.awb_number || orderRow.status !== "Unfulfilled") {
       return {
         error:
           "Only Unfulfilled orders without an AWB can be deleted. Cancel the shipment instead.",
@@ -222,21 +220,15 @@ export async function cancelOrDeleteOrderAction(input: {
     return { error: `Order ${orderRow.order_number} is already ${orderRow.status}.` };
   }
 
-  if (shipRow?.awb) {
-    const cfg = getDelhiveryConfig();
-    if (!cfg) {
-      return {
-        error: "DELHIVERY_API_TOKEN is required to cancel a live Delhivery AWB.",
-      };
-    }
+  if (shipRow?.awb_number) {
     try {
-      const cancelRes = await cancelShipmentApi(shipRow.awb, cfg.token, cfg.env);
+      const cancelRes = await cancelShipment(shipRow.awb_number);
       if (cancelRes.status === false) {
         return {
           error:
             cancelRes.remark ??
             cancelRes.error ??
-            `Delhivery rejected cancellation for AWB ${shipRow.awb}.`,
+            `Delhivery rejected cancellation for AWB ${shipRow.awb_number}.`,
         };
       }
     } catch (err) {
@@ -248,22 +240,23 @@ export async function cancelOrDeleteOrderAction(input: {
       };
     }
 
-    const existingScans = Array.isArray(shipRow.scans_json)
-      ? shipRow.scans_json
+    const existingScans: TrackingScan[] = Array.isArray(shipRow.tracking_scans)
+      ? (shipRow.tracking_scans as TrackingScan[])
       : [];
-    const cancelScan = {
-      status: "Cancelled",
-      location: "Seller Dashboard",
-      time: new Date().toISOString(),
-      instructions: "Shipment cancelled from Kraftman Dispatch Hub",
+    const cancelScan: TrackingScan = {
+      ScanDateTime: new Date().toISOString(),
+      ScanType: "CN",
+      Scan: "Cancelled",
+      Instructions: "Shipment cancelled from Kraftman Dispatch Hub",
+      ScannedLocation: "Seller Dashboard",
     };
 
     await supabase
       .from("shipments")
       .update({
-        current_status: "Cancelled",
-        scans_json: [...existingScans, cancelScan],
-        last_synced_at: new Date().toISOString(),
+        latest_tracking_status: "Cancelled",
+        tracking_scans: [...existingScans, cancelScan],
+        updated_at: new Date().toISOString(),
       })
       .eq("id", shipRow.id);
   }
@@ -279,8 +272,8 @@ export async function cancelOrDeleteOrderAction(input: {
   return {
     data: {
       orderId: input.orderId,
-      message: shipRow?.awb
-        ? `Cancelled shipment AWB ${shipRow.awb}`
+      message: shipRow?.awb_number
+        ? `Cancelled shipment AWB ${shipRow.awb_number}`
         : `Marked order ${orderRow.order_number} as Cancelled`,
     },
   };

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { refreshWalletAction } from "@/actions/delhivery-ops";
 import { checkServiceabilityAction } from "@/actions/serviceability";
 import { createShipmentsAction } from "@/actions/shipments";
 import { syncDelhiveryOneAction } from "@/actions/sync-delhivery-one";
@@ -60,7 +61,9 @@ export function DashboardShell({
 
   const [filter, setFilter] = React.useState<FilterKey>(initialFilter);
   const [search, setSearch] = React.useState(initialQuery);
-  const [wallet, setWallet] = React.useState<WalletSummary | null>(initialWallet);
+  const [walletOverride, setWalletOverride] =
+    React.useState<WalletSummary | null>(null);
+  const wallet = walletOverride ?? initialWallet;
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [activeOrderId, setActiveOrderId] = React.useState<string | null>(
     orders[0]?.id ?? null
@@ -73,6 +76,20 @@ export function DashboardShell({
   const [trackAllPending, startTrackAll] = React.useTransition();
   const [serviceabilityPending, startServiceability] = React.useTransition();
   const [syncAllPending, startSyncAll] = React.useTransition();
+  const [walletPending, startWalletRefresh] = React.useTransition();
+
+  React.useEffect(() => {
+    if (initialWallet) return;
+    let cancelled = false;
+    void refreshWalletAction().then((res) => {
+      if (!cancelled && res.data) {
+        setWalletOverride(res.data);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialWallet]);
   const [quickShipPendingId, setQuickShipPendingId] = React.useState<
     string | null
   >(null);
@@ -334,18 +351,37 @@ export function DashboardShell({
     }
   }
 
+  function handleRefreshWallet() {
+    startWalletRefresh(async () => {
+      const res = await refreshWalletAction();
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      if (res.data) {
+        setWalletOverride(res.data);
+        toast.success(
+          `Wallet balance updated: ${formatWalletINR(res.data.current_balance)}`
+        );
+      }
+    });
+  }
+
   function handleSyncAllActive() {
     startSyncAll(async () => {
       const mcpRes = await syncDelhiveryOneAction();
       if (!mcpRes.error && mcpRes.data) {
         const { syncedOrders, syncedShipments, walletBalance } = mcpRes.data;
         if (typeof walletBalance === "number") {
-          setWallet((prev) => ({
+          setWalletOverride((prev) => ({
             current_balance: walletBalance,
-            minimum_threshold: prev?.minimum_threshold ?? 0,
-            maximum_threshold: prev?.maximum_threshold ?? 0,
-            is_active: prev?.is_active ?? true,
-            payment_gateway: prev?.payment_gateway,
+            minimum_threshold:
+              prev?.minimum_threshold ?? initialWallet?.minimum_threshold ?? 0,
+            maximum_threshold:
+              prev?.maximum_threshold ?? initialWallet?.maximum_threshold ?? 0,
+            is_active: prev?.is_active ?? initialWallet?.is_active ?? true,
+            payment_gateway:
+              prev?.payment_gateway ?? initialWallet?.payment_gateway,
           }));
         }
         const walletMsg =
@@ -373,12 +409,15 @@ export function DashboardShell({
         activeFilter={filter}
         searchQuery={search}
         counts={counts}
+        orders={orders}
         products={products}
         wallet={wallet}
         exportUrl={exportUrl}
         syncAllPending={syncAllPending}
+        walletPending={walletPending}
         trackAllPending={trackAllPending}
         onSyncAll={handleSyncAllActive}
+        onRefreshWallet={handleRefreshWallet}
         onTrackAll={handleTrackAllOrders}
         onFilterChange={handleFilterChange}
         onSearchChange={setSearch}
@@ -424,15 +463,14 @@ export function DashboardShell({
           </div>
         )}
 
-        {dbReady && (
-          <SalesSummarySection
-            sales={sales}
-            wallet={wallet}
-            visibleOrders={orders}
-            isFiltered={filter !== "all" || Boolean(search.trim())}
-            onSelectFilter={handleFilterChange}
-          />
-        )}
+        <SalesSummarySection
+          sales={sales}
+          wallet={wallet}
+          visibleOrders={orders}
+          isFiltered={filter !== "all" || Boolean(search.trim())}
+          onSelectFilter={handleFilterChange}
+          onRefreshWallet={handleRefreshWallet}
+        />
 
         <BatchToolbar
           selectedCount={selectedOrders.length}

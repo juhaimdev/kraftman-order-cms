@@ -13,7 +13,8 @@ BEGIN
       'Manifested',
       'In Transit',
       'Delivered',
-      'NDR'
+      'NDR',
+      'Cancelled'
     );
   END IF;
 
@@ -22,6 +23,8 @@ BEGIN
   END IF;
 END
 $$;
+
+ALTER TYPE public.order_status ADD VALUE IF NOT EXISTS 'Cancelled';
 
 -- 2. Saved Products Catalog (for 1-click weight/dimension presets)
 CREATE TABLE IF NOT EXISTS public.products (

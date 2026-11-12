@@ -5,6 +5,7 @@ import {
   cn,
   deriveTransitInsights,
   formatINR,
+  formatPhoneDisplay,
   getDelhiveryTrackingUrl,
 } from "@/lib/utils";
 import { CallButton } from "@/components/shared/call-button";
@@ -82,8 +83,20 @@ export function OrderCard({
                 {order.payment_method} {formatINR(order.total_amount)}
               </span>
             </div>
-            <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">
+            <p className="mt-0.5 truncate text-sm font-semibold text-slate-900">
               {order.customer_name}
+            </p>
+            <p className="font-mono text-[11px] font-medium text-slate-600">
+              {(() => {
+                const ph = formatPhoneDisplay(order.customer_phone);
+                return ph.text || "No phone";
+              })()}
+              {order.item_description ? (
+                <span className="font-sans text-slate-400">
+                  {" "}
+                  · {order.item_description}
+                </span>
+              ) : null}
             </p>
           </div>
         </div>
@@ -95,14 +108,19 @@ export function OrderCard({
         />
       </div>
 
-      {/* Middle Row: City, PIN & Rich Tracking Info */}
+      {/* Middle Row: Full Customer Address, City, State, PIN & Rich Tracking Info */}
       <div className="mt-2.5 space-y-1.5">
-        <div className="flex items-center gap-1.5 text-xs text-slate-600">
-          <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-          <span className="truncate">
-            {order.city || order.address} ·{" "}
-            <strong className="font-mono text-slate-800">{order.pincode}</strong>
-          </span>
+        <div className="flex items-start gap-1.5 text-xs text-slate-600">
+          <MapPin className="mt-0.5 h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <div className="min-w-0">
+            <p className="line-clamp-2 leading-snug text-slate-700">
+              {order.address}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              {[order.city, order.state].filter(Boolean).join(", ")}{" "}
+              <strong className="font-mono text-slate-800">{order.pincode}</strong>
+            </p>
+          </div>
         </div>
 
         {order.awb_number && (() => {

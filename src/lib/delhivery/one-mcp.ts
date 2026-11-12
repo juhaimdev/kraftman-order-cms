@@ -142,29 +142,32 @@ export async function getWalletDetailsCached(
     if (hit) return { ...hit, cached: true };
   }
 
-  try {
-    const res = await callDelhiveryOneMcpTool<{
-      current_balance?: number;
-      minimum_threshold?: number;
-      maximum_threshold?: number;
-      is_active?: boolean;
-      payment_gateway?: string;
-    }>("get-wallet-details", {});
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await callDelhiveryOneMcpTool<{
+        current_balance?: number;
+        minimum_threshold?: number;
+        maximum_threshold?: number;
+        is_active?: boolean;
+        payment_gateway?: string;
+      }>("get-wallet-details", {});
 
-    if (typeof res?.current_balance !== "number") return null;
+      if (typeof res?.current_balance !== "number") continue;
 
-    const summary: WalletSummary = {
-      current_balance: res.current_balance,
-      minimum_threshold: Number(res.minimum_threshold ?? 0),
-      maximum_threshold: Number(res.maximum_threshold ?? 0),
-      is_active: Boolean(res.is_active ?? true),
-      payment_gateway: res.payment_gateway,
-      cached: false,
-    };
-    await cachePut(cacheKey, summary, 90);
-    return summary;
-  } catch {
-    return null;
+      const summary: WalletSummary = {
+        current_balance: res.current_balance,
+        minimum_threshold: Number(res.minimum_threshold ?? 0),
+        maximum_threshold: Number(res.maximum_threshold ?? 0),
+        is_active: Boolean(res.is_active ?? true),
+        payment_gateway: res.payment_gateway,
+        cached: false,
+      };
+      await cachePut(cacheKey, summary, 90);
+      return summary;
+    } catch {
+      // Retry once on transient MCP/auth timeout
+    }
   }
+  return null;
 }
 

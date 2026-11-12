@@ -86,8 +86,12 @@ export function extractDelhiveryScans(
 
 function cleanPhone(raw?: string[] | string): string {
   const first = Array.isArray(raw) ? raw[0] : raw;
-  const digits = (first ?? "").replace(/\D/g, "").slice(-10);
-  return digits.length === 10 ? digits : "0000000000";
+  const trimmed = (first ?? "").trim();
+  if (!trimmed) return "";
+  if (/[xX*]/.test(trimmed)) return trimmed;
+  const digits = trimmed.replace(/\D/g, "").slice(-10);
+  if (digits.length === 10 && !/^0+$/.test(digits)) return digits;
+  return "";
 }
 
 function cleanPincode(raw?: number | string): string {

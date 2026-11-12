@@ -33,6 +33,7 @@ interface SalesSummarySectionProps {
   visibleOrders: OrderWithShipment[];
   isFiltered: boolean;
   onSelectFilter: (filter: FilterKey) => void;
+  onRefreshWallet?: () => void;
 }
 
 function pct(part: number, total: number): number {
@@ -46,6 +47,7 @@ export function SalesSummarySection({
   visibleOrders,
   isFiltered,
   onSelectFilter,
+  onRefreshWallet,
 }: SalesSummarySectionProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -253,7 +255,11 @@ export function SalesSummarySection({
       {/* Responsive KPI Cards: Delhivery Wallet + Sales Metrics */}
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-5">
         {/* Featured Card 1: Delhivery One Wallet Balance */}
-        <div className="col-span-2 md:col-span-1 rounded-2xl border border-slate-900 bg-gradient-to-br from-slate-950 via-slate-900 to-[#5b1015] p-3.5 text-white shadow-sm">
+        <button
+          type="button"
+          onClick={onRefreshWallet}
+          className="col-span-2 md:col-span-1 rounded-2xl border border-slate-900 bg-gradient-to-br from-slate-950 via-slate-900 to-[#5b1015] p-3.5 text-left text-white shadow-sm transition-opacity hover:opacity-95 cursor-pointer"
+        >
           <div className="flex items-center justify-between text-xs font-medium text-slate-300">
             <span>Delhivery Wallet</span>
             <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white/10">
@@ -261,7 +267,7 @@ export function SalesSummarySection({
             </span>
           </div>
           <p className="mt-1 font-mono text-xl font-bold tracking-tight text-white">
-            {wallet ? formatWalletINR(wallet.current_balance) : "—"}
+            {wallet ? formatWalletINR(wallet.current_balance) : "Tap to load ₹"}
           </p>
           <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-300">
             <span
@@ -276,11 +282,11 @@ export function SalesSummarySection({
             />
             <span>
               {wallet
-                ? `${wallet.is_active ? "Active" : "Paused"}${wallet.payment_gateway ? ` · ${wallet.payment_gateway}` : ""}`
-                : "Tap Sync to load balance"}
+                ? `${wallet.is_active ? "Active" : "Paused"}${wallet.payment_gateway ? ` · ${wallet.payment_gateway}` : ""} · Tap to refresh`
+                : "Tap here to refresh wallet balance"}
             </span>
           </p>
-        </div>
+        </button>
 
         {/* Card 2: Total Sales */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">

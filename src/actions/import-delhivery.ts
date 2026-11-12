@@ -129,9 +129,14 @@ export async function importFromDelhiveryAction(input: {
           order_number: s.orderNumber,
           customer_name: s.customerName,
           customer_phone:
-            s.customerPhone !== "0000000000"
+            s.customerPhone && !/[xX*]/.test(s.customerPhone)
               ? s.customerPhone
-              : ((byOrder?.customer_phone as string | undefined) ?? "0000000000"),
+              : (() => {
+                  const prev = (byOrder?.customer_phone as string | undefined) ?? "";
+                  return prev && !/^0+$/.test(prev.replace(/\D/g, ""))
+                    ? prev
+                    : s.customerPhone;
+                })(),
           address: s.address,
           city: s.city,
           state: s.state,

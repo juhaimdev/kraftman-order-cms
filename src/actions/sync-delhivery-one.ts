@@ -61,11 +61,19 @@ function mapOmsStatus(status?: string): OrderStatus {
   return "Unfulfilled";
 }
 
+function isValidTenDigitPhone(phone?: string | null): boolean {
+  if (!phone || /[xX*]/.test(phone)) return false;
+  const digits = phone.replace(/\D/g, "").slice(-10);
+  return digits.length === 10 && !/^0+$/.test(digits);
+}
+
 function sanitizePhone(raw?: string): string {
-  const digits = (raw ?? "").replace(/\D/g, "").slice(-10);
-  if (digits.length === 10) return digits;
-  const cleaned = (raw ?? "").trim();
-  return cleaned || "0000000000";
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "";
+  if (/[xX*]/.test(trimmed)) return trimmed;
+  const digits = trimmed.replace(/\D/g, "").slice(-10);
+  if (digits.length === 10 && !/^0+$/.test(digits)) return digits;
+  return "";
 }
 
 function sanitizePin(raw?: string): string {
@@ -227,7 +235,7 @@ export async function syncDelhiveryOneAction(): Promise<{
     const [existingOrdersRes, existingShipmentsRes] = await Promise.all([
       supabase
         .from("orders")
-        .select("id, order_number")
+        .select("id, order_number, customer_phone")
         .in("order_number", orderNumbers),
       awbList.length > 0
         ? supabase
@@ -241,6 +249,12 @@ export async function syncDelhiveryOneAction(): Promise<{
       (existingOrdersRes.data ?? []).map((r) => [
         r.order_number as string,
         r.id as string,
+      ])
+    );
+    const existingPhoneById = new Map(
+      (existingOrdersRes.data ?? []).map((r) => [
+        r.id as string,
+        (r.customer_phone as string | null) ?? "",
       ])
     );
     const orderIdByAwb = new Map(
@@ -302,12 +316,19 @@ export async function syncDelhiveryOneAction(): Promise<{
         orderIdByNumber.get(orderNumber) ??
         (awb ? orderIdByAwb.get(awb) : undefined) ??
         fallbackId;
+      const incomingPhone = sanitizePhone(detail.shipping_address_phone_number);
+      const savedPhone = existingPhoneById.get(orderId) ?? "";
+      const finalPhone = isValidTenDigitPhone(incomingPhone)
+        ? incomingPhone
+        : isValidTenDigitPhone(savedPhone)
+          ? savedPhone
+          : incomingPhone || savedPhone;
 
       orderRows.push({
         id: orderId,
         order_number: orderNumber,
         customer_name: fullName || "Consignee",
-        customer_phone: sanitizePhone(detail.shipping_address_phone_number),
+        customer_phone: finalPhone,
         address: (detail.shipping_address_address_line || "").trim() || "—",
         city: (detail.shipping_address_city || "").trim(),
         state: (detail.shipping_address_state || "").trim(),

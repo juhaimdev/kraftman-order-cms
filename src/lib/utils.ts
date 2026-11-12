@@ -59,6 +59,44 @@ export function normalizeTelHref(phone: string): string {
   return `tel:+91${digits}`;
 }
 
+export function formatPhoneDisplay(phone?: string | null): {
+  text: string;
+  isValid: boolean;
+  isMasked: boolean;
+} {
+  const raw = (phone ?? "").trim();
+  if (!raw) {
+    return { text: "", isValid: false, isMasked: false };
+  }
+  const hasMask = /[xX*]/.test(raw);
+  const digitsOnly = raw.replace(/\D/g, "");
+  // Treat zero-filled placeholders ("0000000000", "910000000000") as missing
+  if (!hasMask && (/^0+$/.test(digitsOnly) || digitsOnly === "910000000000")) {
+    return { text: "", isValid: false, isMasked: false };
+  }
+  if (hasMask) {
+    const cleanedMask = raw.replace(/^\+?91[\s-]?/, "");
+    return {
+      text: `+91 ${cleanedMask}`,
+      isValid: false,
+      isMasked: true,
+    };
+  }
+  const last10 = digitsOnly.slice(-10);
+  if (last10.length === 10 && !/^0+$/.test(last10)) {
+    return {
+      text: `+91 ${last10}`,
+      isValid: true,
+      isMasked: false,
+    };
+  }
+  return {
+    text: raw,
+    isValid: false,
+    isMasked: false,
+  };
+}
+
 export function getDelhiveryTrackingUrl(awb: string): string {
   return `https://www.delhivery.com/track-v2/package/${encodeURIComponent(awb.trim())}`;
 }

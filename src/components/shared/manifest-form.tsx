@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Boxes, Loader2, PackagePlus, Zap } from "lucide-react";
+import { Boxes, Calculator, Loader2, PackagePlus, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { calculateShippingRatesAction } from "@/actions/delhivery-ops";
 import { createShipmentsAction } from "@/actions/shipments";
-import type { ProductPreset } from "@/lib/db/types";
+import type { ProductPreset, ShippingRateQuote } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,9 @@ interface ManifestFormProps {
   defaultProductId?: string | null;
   defaultDesc?: string | null;
   defaultWeight?: number;
+  orderPincode?: string;
+  paymentMethod?: "COD" | "Prepaid";
+  orderAmount?: number;
   onSuccess?: () => void;
   submitLabel?: string;
 }
@@ -25,6 +29,9 @@ export function ManifestForm({
   defaultProductId,
   defaultDesc,
   defaultWeight = 500,
+  orderPincode,
+  paymentMethod = "Prepaid",
+  orderAmount = 0,
   onSuccess,
   submitLabel,
 }: ManifestFormProps) {
@@ -54,7 +61,37 @@ export function ManifestForm({
         ? `${initialProduct.name}${initialProduct.size_label ? ` (${initialProduct.size_label})` : ""}`
         : "")
   );
+  const [quotes, setQuotes] = React.useState<ShippingRateQuote[]>([]);
+  const [rateLoading, setRateLoading] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
+
+  async function handleEstimatePrice() {
+    if (!orderPincode || !/^\d{6}$/.test(orderPincode)) {
+      toast.error("Valid 6-digit customer PIN code required to check rate.");
+      return;
+    }
+    setRateLoading(true);
+    try {
+      const res = await calculateShippingRatesAction({
+        origin_pin: "673602",
+        destination_pin: orderPincode,
+        weight_grams: Math.max(10, Number(weight) || 500),
+        length_cm: Math.max(1, Number(length) || 20),
+        breadth_cm: Math.max(1, Number(width) || 15),
+        height_cm: Math.max(1, Number(height) || 10),
+        packaging_type: "BOX",
+        payment_method: paymentMethod,
+        cod_amount: paymentMethod === "COD" ? orderAmount : 0,
+      });
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        setQuotes(res.data ?? []);
+      }
+    } finally {
+      setRateLoading(false);
+    }
+  }
 
   function runManifest(params: {
     weightGrams: number;
@@ -263,6 +300,50 @@ export function ManifestForm({
           />
         </label>
       </div>
+
+      {orderPincode && /^\d{6}$/.test(orderPincode) && (
+        <div className="space-y-2 rounded-lg border border-emerald-200/80 bg-emerald-50/40 p-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-950">
+              <Calculator className="h-3.5 w-3.5 text-emerald-600" />
+              Estimated Shipping Cost (to {orderPincode})
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={rateLoading}
+              onClick={() => void handleEstimatePrice()}
+              className="min-h-8 h-8 text-[11px] bg-white"
+            >
+              {rateLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Calculator className="h-3 w-3" />
+              )}
+              <span>{quotes.length > 0 ? "Refresh Rate" : "Check Price"}</span>
+            </Button>
+          </div>
+          {quotes.length > 0 && (
+            <div className="grid grid-cols-2 gap-2">
+              {quotes.map((q) => (
+                <div
+                  key={q.mode}
+                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900">{q.mode}</span>
+                    <span className="font-mono text-slate-500">Zone {q.zone}</span>
+                  </div>
+                  <p className="font-mono text-sm font-bold text-slate-950">
+                    ₹{q.total_amount.toFixed(2)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <Button
         type="submit"

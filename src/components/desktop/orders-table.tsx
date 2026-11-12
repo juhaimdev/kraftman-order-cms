@@ -8,6 +8,7 @@ import {
   deriveTransitInsights,
   formatDateTime,
   formatINR,
+  formatPhoneDisplay,
   getDelhiveryTrackingUrl,
 } from "@/lib/utils";
 import { CallButton } from "@/components/shared/call-button";
@@ -167,19 +168,41 @@ export function OrdersTable({
                     </div>
                   </td>
 
-                  <td className="px-3 py-3">
-                    <div className="font-medium text-slate-900">
+                  <td className="px-3 py-3 max-w-[200px]">
+                    <div className="font-semibold text-slate-900 truncate">
                       {order.customer_name}
                     </div>
-                    <div className="font-mono text-xs text-slate-500">
-                      {order.customer_phone}
-                    </div>
+                    {(() => {
+                      const ph = formatPhoneDisplay(order.customer_phone);
+                      return (
+                        <div className="font-mono text-xs text-slate-600">
+                          {ph.text || (
+                            <span className="font-sans text-[11px] text-amber-700">
+                              Phone missing — Edit
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {order.item_description && (
+                      <div className="mt-0.5 truncate text-[11px] text-slate-500">
+                        {order.item_description}
+                      </div>
+                    )}
                   </td>
 
-                  <td className="px-3 py-3">
-                    <div className="text-slate-800">{order.city || "—"}</div>
-                    <div className="font-mono text-xs font-semibold text-slate-500">
-                      {order.pincode}
+                  <td className="px-3 py-3 max-w-[240px]">
+                    <div
+                      className="line-clamp-2 text-xs leading-snug text-slate-700"
+                      title={order.address}
+                    >
+                      {order.address}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">
+                      {[order.city, order.state].filter(Boolean).join(", ") || "—"}{" "}
+                      <span className="font-mono font-semibold text-slate-800">
+                        {order.pincode}
+                      </span>
                     </div>
                   </td>
 

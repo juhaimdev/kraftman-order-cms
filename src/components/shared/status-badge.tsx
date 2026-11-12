@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import type { OrderStatus } from "@/lib/db/types";
 import {
   AlertTriangle,
+  Ban,
   CheckCircle2,
   Clock,
   PackageCheck,
@@ -20,6 +21,7 @@ const STATUS_CONFIG: Record<
   "In Transit": { variant: "indigo", icon: Truck },
   Delivered: { variant: "emerald", icon: CheckCircle2 },
   NDR: { variant: "red", icon: AlertTriangle },
+  Cancelled: { variant: "red", icon: Ban },
 };
 
 export function StatusBadge({

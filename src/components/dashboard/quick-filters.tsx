@@ -13,13 +13,16 @@ import {
 } from "lucide-react";
 import type {
   DashboardCounts,
+  OrderWithShipment,
   ProductPreset,
   WalletSummary,
 } from "@/lib/db/types";
 import { cn, formatWalletINR } from "@/lib/utils";
 import { AddOrderDialog } from "@/components/shared/add-order-dialog";
 import { ImportDelhiveryDialog } from "@/components/shared/import-delhivery-dialog";
+import { OperationsHubDialog } from "@/components/shared/operations-hub-dialog";
 import { ProductsDialog } from "@/components/shared/products-dialog";
+import { RateCalculatorDialog } from "@/components/shared/rate-calculator-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -29,12 +32,15 @@ interface QuickFiltersProps {
   activeFilter: FilterKey;
   searchQuery: string;
   counts: DashboardCounts;
+  orders: OrderWithShipment[];
   products: ProductPreset[];
   wallet?: WalletSummary | null;
   exportUrl: string;
   syncAllPending?: boolean;
+  walletPending?: boolean;
   trackAllPending?: boolean;
   onSyncAll?: () => void;
+  onRefreshWallet?: () => void;
   onTrackAll?: () => void;
   onFilterChange: (filter: FilterKey) => void;
   onSearchChange: (q: string) => void;
@@ -44,12 +50,15 @@ export function QuickFilters({
   activeFilter,
   searchQuery,
   counts,
+  orders,
   products,
   wallet,
   exportUrl,
   syncAllPending = false,
+  walletPending = false,
   trackAllPending = false,
   onSyncAll,
+  onRefreshWallet,
   onTrackAll,
   onFilterChange,
   onSearchChange,
@@ -88,34 +97,46 @@ export function QuickFilters({
             </div>
           </div>
 
-          {/* Live Wallet Balance Pill */}
-          {wallet && (
-            <button
-              type="button"
-              onClick={onSyncAll}
-              disabled={syncAllPending}
-              title={`Delhivery One Wallet (${wallet.is_active ? "Active" : "Inactive"}${wallet.payment_gateway ? ` · ${wallet.payment_gateway}` : ""}). Click to refresh.`}
-              className={cn(
-                "inline-flex min-h-10 sm:min-h-9 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold transition-colors cursor-pointer",
-                isLowBalance
-                  ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                  : "border-emerald-200 bg-emerald-50/90 text-emerald-900 hover:bg-emerald-100"
-              )}
-            >
+          {/* Always-Visible Live Wallet Balance Pill */}
+          <button
+            type="button"
+            onClick={onRefreshWallet ?? onSyncAll}
+            disabled={walletPending || syncAllPending}
+            title={
+              wallet
+                ? `Delhivery One Wallet (${wallet.is_active ? "Active" : "Inactive"}${wallet.payment_gateway ? ` · ${wallet.payment_gateway}` : ""}). Click to refresh.`
+                : "Click to load live Delhivery One Wallet balance"
+            }
+            className={cn(
+              "inline-flex min-h-10 sm:min-h-9 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold transition-colors cursor-pointer",
+              isLowBalance
+                ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                : wallet
+                  ? "border-emerald-200 bg-emerald-50/90 text-emerald-900 hover:bg-emerald-100"
+                  : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+            )}
+          >
+            {walletPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+            ) : (
               <Wallet
                 className={cn(
                   "h-3.5 w-3.5",
-                  isLowBalance ? "text-amber-600" : "text-emerald-600"
+                  isLowBalance
+                    ? "text-amber-600"
+                    : wallet
+                      ? "text-emerald-600"
+                      : "text-slate-500"
                 )}
               />
-              <span className="hidden sm:inline text-[11px] font-medium opacity-80">
-                Wallet
-              </span>
-              <span className="font-mono font-bold">
-                {formatWalletINR(wallet.current_balance)}
-              </span>
-            </button>
-          )}
+            )}
+            <span className="hidden sm:inline text-[11px] font-medium opacity-80">
+              Wallet
+            </span>
+            <span className="font-mono font-bold">
+              {wallet ? formatWalletINR(wallet.current_balance) : "Load ₹"}
+            </span>
+          </button>
 
           <div className="relative flex-1 min-w-[150px]">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -139,6 +160,8 @@ export function QuickFilters({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            <RateCalculatorDialog products={products} />
+            <OperationsHubDialog orders={orders} ndrCount={counts.ndr} />
             <ProductsDialog products={products} />
 
             {onTrackAll && (
