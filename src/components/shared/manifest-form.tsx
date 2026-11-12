@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { calculateShippingRatesAction } from "@/actions/delhivery-ops";
 import { createShipmentsAction } from "@/actions/shipments";
 import type { ProductPreset, ShippingRateQuote } from "@/lib/db/types";
-import { cn } from "@/lib/utils";
+import { cn, triggerLabelDownload } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -120,20 +120,15 @@ export function ManifestForm({
       if (res.data) {
         const { succeeded, failed } = res.data;
         if (succeeded.length > 0) {
-          const wbns = succeeded.map((s) => s.awb).join(",");
+          const wbns = succeeded.map((s) => s.awb);
           toast.success(
             succeeded.length === 1
               ? `Manifested! AWB: ${succeeded[0].awb}`
               : `Manifested ${succeeded.length} shipment(s)`,
             {
               action: {
-                label: "Print 4x6",
-                onClick: () =>
-                  window.open(
-                    `/api/labels?wbns=${encodeURIComponent(wbns)}`,
-                    "_blank",
-                    "noopener,noreferrer"
-                  ),
+                label: "Download Label",
+                onClick: () => triggerLabelDownload(wbns),
               },
             }
           );

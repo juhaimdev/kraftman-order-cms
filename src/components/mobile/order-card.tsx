@@ -7,6 +7,7 @@ import {
   formatINR,
   formatPhoneDisplay,
   getDelhiveryTrackingUrl,
+  getLabelUrl,
 } from "@/lib/utils";
 import { CallButton } from "@/components/shared/call-button";
 import { CopyButton } from "@/components/shared/copy-button";
@@ -14,6 +15,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { WhatsAppButton } from "@/components/shared/whatsapp-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Download,
   ExternalLink,
   Loader2,
   MapPin,
@@ -187,11 +189,22 @@ export function OrderCard({
               <ExternalLink className="h-4 w-4" />
             </a>
             <a
-              href={`/api/labels?wbns=${encodeURIComponent(order.awb_number)}`}
+              href={getLabelUrl(order.awb_number, { download: true })}
+              download
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Download shipping label PDF for ${order.order_number}`}
+              title="1-Click Download 4x6 Shipping Label PDF"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            >
+              <Download className="h-4 w-4" />
+            </a>
+            <a
+              href={getLabelUrl(order.awb_number)}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               aria-label={`Print label for ${order.order_number}`}
+              title="Open Print 4x6 Label"
               className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-700 hover:bg-slate-100"
             >
               <Printer className="h-4 w-4" />

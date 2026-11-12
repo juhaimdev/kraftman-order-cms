@@ -1,13 +1,22 @@
 "use client";
 
 import * as React from "react";
-import { Calculator, Loader2, Plus } from "lucide-react";
+import {
+  Calculator,
+  CheckCircle2,
+  Download,
+  Loader2,
+  Plus,
+  Printer,
+  Zap,
+} from "lucide-react";
 import { toast } from "sonner";
 import { calculateShippingRatesAction } from "@/actions/delhivery-ops";
 import { createOrderAction } from "@/actions/orders";
 import { checkServiceabilityAction } from "@/actions/serviceability";
+import { createShipmentsAction } from "@/actions/shipments";
 import type { ProductPreset, ShippingRateQuote } from "@/lib/db/types";
-import { cn } from "@/lib/utils";
+import { cn, getLabelUrl, triggerLabelDownload } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,6 +65,14 @@ export function AddOrderDialog({
   const [rateQuotes, setRateQuotes] = React.useState<ShippingRateQuote[]>([]);
   const [rateError, setRateError] = React.useState<string | null>(null);
   const [rateLoading, setRateLoading] = React.useState(false);
+  const [bookedOrder, setBookedOrder] = React.useState<{
+    id: string;
+    orderNumber: string;
+    customerName: string;
+    awb?: string;
+    shipError?: string;
+  } | null>(null);
+  const [shipDraftPending, startShipDraft] = React.useTransition();
 
   const fetchRateEstimate = React.useCallback(
     async (params: {
@@ -165,8 +182,22 @@ export function AddOrderDialog({
     });
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function clearFormFields() {
+    setSelectedProductId("");
+    setItemDescription("");
+    setOrderNumber("");
+    setCustomerName("");
+    setCustomerPhone("");
+    setAddress("");
+    setCity("");
+    setState("");
+    setPincode("");
+    setPinMsg(null);
+    setRateQuotes([]);
+    setRateError(null);
+  }
+
+  function submitOrder(autoShip: boolean) {
     startTransition(async () => {
       const res = await createOrderAction({
         order_number: orderNumber,
@@ -182,25 +213,103 @@ export function AddOrderDialog({
         item_description: itemDescription,
       });
 
-      if (res.error) {
-        toast.error(res.error);
+      if (res.error || !res.data) {
+        toast.error(res.error ?? "Failed to create order");
         return;
       }
 
-      toast.success(`Order ${res.data?.orderNumber} created`);
-      setOpen(false);
-      setSelectedProductId("");
-      setItemDescription("");
-      setOrderNumber("");
-      setCustomerName("");
-      setCustomerPhone("");
-      setAddress("");
-      setCity("");
-      setState("");
-      setPincode("");
-      setPinMsg(null);
-      setRateQuotes([]);
-      setRateError(null);
+      const createdOrderId = res.data.id;
+      const createdOrderNum = res.data.orderNumber;
+      const createdCust = customerName.trim();
+
+      if (autoShip) {
+        const shipRes = await createShipmentsAction({
+          orderIds: [createdOrderId],
+          weightGrams: Math.max(10, Number(weightGrams) || 500),
+          dimensions: {
+            length: Math.max(1, Number(lengthCm) || 20),
+            width: Math.max(1, Number(breadthCm) || 15),
+            height: Math.max(1, Number(heightCm) || 10),
+          },
+          productsDesc: itemDescription || undefined,
+        });
+
+        const awb = shipRes.data?.succeeded[0]?.awb;
+        const shipErr =
+          shipRes.error ?? shipRes.data?.failed[0]?.reason;
+
+        if (awb) {
+          toast.success(`Booked & shipped ${createdOrderNum} (AWB: ${awb})`, {
+            action: {
+              label: "Download Label",
+              onClick: () => triggerLabelDownload(awb),
+            },
+          });
+          setBookedOrder({
+            id: createdOrderId,
+            orderNumber: createdOrderNum,
+            customerName: createdCust,
+            awb,
+          });
+          clearFormFields();
+          return;
+        }
+
+        toast.warning(
+          `Order ${createdOrderNum} saved, but AWB failed: ${shipErr || "Try shipping manually"}`
+        );
+        setBookedOrder({
+          id: createdOrderId,
+          orderNumber: createdOrderNum,
+          customerName: createdCust,
+          shipError: shipErr || "Unable to manifest right now",
+        });
+        clearFormFields();
+        return;
+      }
+
+      toast.success(`Order ${createdOrderNum} saved`);
+      setBookedOrder({
+        id: createdOrderId,
+        orderNumber: createdOrderNum,
+        customerName: createdCust,
+      });
+      clearFormFields();
+    });
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    submitOrder(false);
+  }
+
+  function handleGenerateAwbForDraft() {
+    if (!bookedOrder) return;
+    startShipDraft(async () => {
+      const shipRes = await createShipmentsAction({
+        orderIds: [bookedOrder.id],
+        weightGrams: Math.max(10, Number(weightGrams) || 500),
+        dimensions: {
+          length: Math.max(1, Number(lengthCm) || 20),
+          width: Math.max(1, Number(breadthCm) || 15),
+          height: Math.max(1, Number(heightCm) || 10),
+        },
+        productsDesc: itemDescription || undefined,
+      });
+      if (shipRes.error) {
+        toast.error(shipRes.error);
+        return;
+      }
+      const awb = shipRes.data?.succeeded[0]?.awb;
+      const err = shipRes.data?.failed[0]?.reason;
+      if (awb) {
+        setBookedOrder((prev) =>
+          prev ? { ...prev, awb, shipError: undefined } : prev
+        );
+        toast.success(`AWB generated: ${awb}`);
+      } else if (err) {
+        toast.error(err);
+      }
     });
   }
 
@@ -208,7 +317,13 @@ export function AddOrderDialog({
   const surfaceQuote = rateQuotes.find((q) => q.mode === "SURFACE");
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setBookedOrder(null);
+      }}
+    >
       <DialogTrigger asChild>
         <Button type="button" variant="primary" size="sm" className="shrink-0">
           <Plus className="h-4 w-4" />
@@ -225,7 +340,89 @@ export function AddOrderDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        {bookedOrder ? (
+          <div className="space-y-4 py-1">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 p-4 space-y-2">
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-emerald-950">
+                    Order {bookedOrder.orderNumber} Saved
+                  </p>
+                  <p className="text-xs text-emerald-800">
+                    Customer: <strong>{bookedOrder.customerName}</strong>
+                  </p>
+                  {bookedOrder.awb && (
+                    <p className="mt-1 font-mono text-xs font-bold text-slate-900">
+                      AWB: {bookedOrder.awb}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {bookedOrder.shipError && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {bookedOrder.shipError}
+                </p>
+              )}
+
+              {bookedOrder.awb ? (
+                <div className="flex flex-wrap items-center gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => triggerLabelDownload(bookedOrder.awb!)}
+                    className="flex-1 min-w-[180px]"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>1-Click Download Label (PDF)</span>
+                  </Button>
+                  <a
+                    href={getLabelUrl(bookedOrder.awb)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                  >
+                    <Printer className="h-4 w-4" />
+                    <span>Print 4x6</span>
+                  </a>
+                </div>
+              ) : (
+                <div className="pt-2">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={shipDraftPending}
+                    onClick={handleGenerateAwbForDraft}
+                    className="w-full"
+                  >
+                    {shipDraftPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Zap className="h-4 w-4" />
+                    )}
+                    <span>Generate AWB &amp; Unlock 1-Click Label Download</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setBookedOrder(null)}
+              >
+                <Plus className="h-4 w-4" />
+                <span>Create Another Order</span>
+              </Button>
+              <Button type="button" onClick={() => setOpen(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3">
           {products.length > 0 && (
             <label className="block text-xs font-medium text-slate-700">
               Saved Product Preset (auto-fills size, weight &amp; price)
@@ -536,16 +733,33 @@ export function AddOrderDialog({
             )}
           </div>
 
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={pending}
-            className="w-full"
-          >
-            {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-            <span>Save Order</span>
-          </Button>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={pending}
+              className="w-full"
+            >
+              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+              <span>Save Draft Order</span>
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={pending}
+              onClick={() => submitOrder(true)}
+              className="w-full"
+            >
+              {pending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
+              <span>Book &amp; Download Label</span>
+            </Button>
+          </div>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

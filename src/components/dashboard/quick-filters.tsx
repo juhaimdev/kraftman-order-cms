@@ -21,6 +21,7 @@ import type {
 } from "@/lib/db/types";
 import { cn, formatWalletINR } from "@/lib/utils";
 import { AddOrderDialog } from "@/components/shared/add-order-dialog";
+import { BulkOrderDialog } from "@/components/shared/bulk-order-dialog";
 import { ImportDelhiveryDialog } from "@/components/shared/import-delhivery-dialog";
 import { OperationsHubDialog } from "@/components/shared/operations-hub-dialog";
 import { ProductsDialog } from "@/components/shared/products-dialog";
@@ -192,6 +193,7 @@ export function QuickFilters({
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 md:pb-0 md:overflow-visible shrink-0">
+            <BulkOrderDialog products={products} />
             <RateCalculatorDialog products={products} />
             <OperationsHubDialog orders={orders} ndrCount={counts.ndr} />
             <ProductsDialog products={products} />

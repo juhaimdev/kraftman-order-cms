@@ -1,5 +1,9 @@
 import { Suspense } from "react";
-import { listOrdersWithShipments, listProducts } from "@/lib/db/queries";
+import {
+  getSalesDashboardData,
+  listOrdersWithShipments,
+  listProducts,
+} from "@/lib/db/queries";
 import { getWalletDetailsCached } from "@/lib/delhivery/one-mcp";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import type { FilterKey } from "@/components/dashboard/quick-filters";
@@ -21,12 +25,17 @@ async function OrdersFeed({
   const filter = normalizeFilter(params.filter);
   const query = params.q?.trim() ?? "";
 
-  const [{ orders, counts, sales, dbReady, dbReason }, products, wallet] =
-    await Promise.all([
-      listOrdersWithShipments({ filter, q: query }),
-      listProducts(),
-      getWalletDetailsCached(),
-    ]);
+  const [
+    { orders, counts, sales, dbReady, dbReason },
+    products,
+    wallet,
+    analytics,
+  ] = await Promise.all([
+    listOrdersWithShipments({ filter, q: query }),
+    listProducts(),
+    getWalletDetailsCached(),
+    getSalesDashboardData(14),
+  ]);
 
   return (
     <DashboardShell
@@ -35,6 +44,7 @@ async function OrdersFeed({
       wallet={wallet}
       counts={counts}
       sales={sales}
+      dailySeries={analytics.dailySeries}
       dbReady={dbReady}
       dbReason={dbReason}
       initialFilter={filter}

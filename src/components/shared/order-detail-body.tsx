@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   Ban,
+  Download,
   ExternalLink,
   Loader2,
   MapPin,
@@ -26,6 +27,7 @@ import {
   formatINR,
   formatPhoneDisplay,
   getDelhiveryTrackingUrl,
+  getLabelUrl,
 } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -513,14 +515,23 @@ export function OrderDetailBody({
 
           <div className="grid grid-cols-2 gap-2.5">
             <a
-              href={`/api/labels?wbns=${encodeURIComponent(order.awb_number)}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={getLabelUrl(order.awb_number, { download: true })}
+              download
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#D9232A] px-3 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-[#B71C22] active:scale-[0.98]"
             >
+              <Download className="h-4 w-4" />
+              <span>Download Label PDF</span>
+            </a>
+
+            <a
+              href={getLabelUrl(order.awb_number)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-2xs transition-colors hover:bg-slate-50 active:scale-[0.98]"
+            >
               <Printer className="h-4 w-4" />
-              <span>Print 4x6 Label</span>
-              <ExternalLink className="h-3 w-3 opacity-80" />
+              <span>Print 4x6 View</span>
+              <ExternalLink className="h-3 w-3 opacity-70" />
             </a>
 
             <Button

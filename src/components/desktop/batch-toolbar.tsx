@@ -21,6 +21,7 @@ interface BatchToolbarProps {
   onCheckServiceability: () => void;
   onGenerateAwb: () => void;
   onPrintLabels: () => void;
+  onDownloadLabels: () => void;
   onExportAwbs: () => void;
   onSyncTracking: () => void;
   onClearSelection: () => void;
@@ -35,6 +36,7 @@ export function BatchToolbar({
   onCheckServiceability,
   onGenerateAwb,
   onPrintLabels,
+  onDownloadLabels,
   onExportAwbs,
   onSyncTracking,
   onClearSelection,
@@ -90,11 +92,23 @@ export function BatchToolbar({
           size="sm"
           variant="secondary"
           disabled={awbCount === 0}
+          onClick={onDownloadLabels}
+          className="bg-emerald-600 text-white hover:bg-emerald-700"
+        >
+          <Download className="h-3.5 w-3.5" />
+          <span>Download Labels PDF ({awbCount})</span>
+        </Button>
+
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={awbCount === 0}
           onClick={onPrintLabels}
           className="bg-white text-slate-900 hover:bg-slate-100"
         >
           <Printer className="h-3.5 w-3.5" />
-          <span>Bulk Print 4x6 ({awbCount})</span>
+          <span>Print 4x6 ({awbCount})</span>
         </Button>
 
         <Button

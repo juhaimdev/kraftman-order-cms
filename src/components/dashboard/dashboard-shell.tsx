@@ -13,13 +13,14 @@ import {
   syncTrackingAction,
 } from "@/actions/tracking";
 import type {
+  DailySalesPoint,
   DashboardCounts,
   OrderWithShipment,
   ProductPreset,
   SalesSummary,
   WalletSummary,
 } from "@/lib/db/types";
-import { formatINR, formatWalletINR } from "@/lib/utils";
+import { formatINR, formatWalletINR, triggerLabelDownload } from "@/lib/utils";
 import { BatchToolbar } from "@/components/desktop/batch-toolbar";
 import { OrdersTable } from "@/components/desktop/orders-table";
 import { SidePanel } from "@/components/desktop/side-panel";
@@ -30,6 +31,7 @@ import { AddOrderDialog } from "@/components/shared/add-order-dialog";
 import { BulkManifestDialog } from "@/components/shared/bulk-manifest-dialog";
 import { ImportDelhiveryDialog } from "@/components/shared/import-delhivery-dialog";
 import { Button } from "@/components/ui/button";
+import { OrdersAnalyticsSection } from "./orders-analytics";
 import { QuickFilters, type FilterKey } from "./quick-filters";
 import { SalesSummarySection } from "./sales-summary";
 import {
@@ -47,6 +49,7 @@ interface DashboardShellProps {
   wallet?: WalletSummary | null;
   counts: DashboardCounts;
   sales: SalesSummary;
+  dailySeries?: DailySalesPoint[];
   dbReady: boolean;
   dbReason?: "missing_env" | "missing_schema";
   initialFilter: FilterKey;
@@ -59,6 +62,7 @@ export function DashboardShell({
   wallet: initialWallet = null,
   counts,
   sales,
+  dailySeries = [],
   dbReady,
   dbReason,
   initialFilter,
@@ -229,6 +233,22 @@ export function DashboardShell({
     window.open(`/api/labels?wbns=${encodeURIComponent(wbns)}`, "_blank", "noopener,noreferrer");
   }
 
+  function handleDownloadLabelsClick() {
+    const targets =
+      selectedWithAwb.length > 0
+        ? selectedWithAwb
+        : activeOrder?.awb_number
+          ? [activeOrder]
+          : [];
+
+    if (targets.length === 0) {
+      toast.info("Select at least one manifested order to download labels PDF");
+      return;
+    }
+
+    triggerLabelDownload(targets.map((o) => o.awb_number!));
+  }
+
   function handleSyncTrackingClick() {
     const targets =
       selectedWithAwb.length > 0
@@ -345,13 +365,8 @@ export function DashboardShell({
     if (ok) {
       toast.success(`Shipped ${ok.orderNumber}! AWB: ${ok.awb}`, {
         action: {
-          label: "Print 4x6",
-          onClick: () =>
-            window.open(
-              `/api/labels?wbns=${encodeURIComponent(ok.awb)}`,
-              "_blank",
-              "noopener,noreferrer"
-            ),
+          label: "Download Label",
+          onClick: () => triggerLabelDownload(ok.awb),
         },
       });
     } else if (err) {
@@ -507,6 +522,14 @@ export function DashboardShell({
           />
         </div>
 
+        {/* Graph-Style Data Analytics for Orders */}
+        <OrdersAnalyticsSection
+          counts={counts}
+          sales={sales}
+          dailySeries={dailySeries}
+          onSelectFilter={handleFilterChange}
+        />
+
         <BatchToolbar
           selectedCount={selectedOrders.length}
           unfulfilledCount={selectedUnfulfilled.length}
@@ -516,6 +539,7 @@ export function DashboardShell({
           onCheckServiceability={handleBatchServiceability}
           onGenerateAwb={handleGenerateAwbClick}
           onPrintLabels={handlePrintLabelsClick}
+          onDownloadLabels={handleDownloadLabelsClick}
           onExportAwbs={handleExportSelectedAwbs}
           onSyncTracking={handleSyncTrackingClick}
           onClearSelection={() => setSelectedIds(new Set())}
@@ -622,7 +646,7 @@ export function DashboardShell({
         ndrCount={counts.ndr}
         syncPending={syncAllPending}
         onGenerateAwb={handleGenerateAwbClick}
-        onPrintLabels={handlePrintLabelsClick}
+        onPrintLabels={handleDownloadLabelsClick}
         onSyncTracking={handleSyncTrackingClick}
         onSyncAll={handleSyncAllActive}
         onClearSelection={() => setSelectedIds(new Set())}

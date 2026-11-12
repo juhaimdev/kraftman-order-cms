@@ -567,3 +567,4 @@ export async function generateDelhiveryLabelPdf(
 
   return doc.save();
 }
+
