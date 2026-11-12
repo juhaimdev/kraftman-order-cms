@@ -184,3 +184,33 @@ export interface DelhiveryExceptionItem {
     label: string;
   }>;
 }
+
+export interface DailySalesPoint {
+  date: string; // YYYY-MM-DD in IST
+  label: string; // e.g. "12 Nov"
+  revenue: number;
+  orders: number;
+  cod_revenue: number;
+  prepaid_revenue: number;
+  delivered: number;
+  ndr: number;
+}
+
+export interface StateSalesItem {
+  state: string;
+  order_count: number;
+  revenue: number;
+}
+
+export interface SalesDashboardData {
+  sales: SalesSummary;
+  counts: DashboardCounts;
+  dailySeries: DailySalesPoint[];
+  stateBreakdown: StateSalesItem[];
+  deliveryRatePct: number;
+  codSharePct: number;
+  wallet: WalletSummary | null;
+  dbReady: boolean;
+  dbReason?: "missing_env" | "missing_schema";
+  updatedAt: string;
+}

@@ -147,9 +147,21 @@ export const schedulePickupSchema = z.object({
   expected_package_count: z.coerce.number().int().min(1).max(500),
 });
 
+export const bulkCreateOrdersSchema = z.object({
+  orders: z
+    .array(createOrderSchema)
+    .min(1, "Add at least 1 order")
+    .max(100, "Maximum 100 orders per bulk batch"),
+  autoManifest: z.boolean().default(false),
+  weightGrams: weightSchema.optional(),
+  dimensions: dimensionSchema.optional(),
+  productsDesc: z.string().trim().max(120).optional(),
+});
+
 export type CreateShipmentsInput = z.infer<typeof createShipmentsSchema>;
 export type NdrUpdateInput = z.infer<typeof ndrUpdateSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+export type BulkCreateOrdersInput = z.infer<typeof bulkCreateOrdersSchema>;
 export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
 export type ProductPresetInput = z.infer<typeof productPresetSchema>;
 export type RateCheckInput = z.infer<typeof rateCheckSchema>;

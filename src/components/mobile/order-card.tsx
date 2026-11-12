@@ -50,7 +50,7 @@ export function OrderCard({
     <article
       onClick={() => onOpenDetail(order)}
       className={cn(
-        "rounded-xl border bg-white p-3.5 shadow-2xs transition-colors active:bg-slate-50/70 cursor-pointer",
+        "min-w-0 overflow-hidden rounded-xl border bg-white p-3.5 shadow-2xs transition-colors active:bg-slate-50/70 cursor-pointer",
         selected ? "border-blue-500 ring-1 ring-blue-500/30" : "border-slate-200"
       )}
     >
@@ -68,7 +68,7 @@ export function OrderCard({
             />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="font-mono text-sm font-bold text-slate-900">
                 {order.order_number}
               </span>
@@ -86,7 +86,7 @@ export function OrderCard({
             <p className="mt-0.5 truncate text-sm font-semibold text-slate-900">
               {order.customer_name}
             </p>
-            <p className="font-mono text-[11px] font-medium text-slate-600">
+            <p className="truncate font-mono text-[11px] font-medium text-slate-600">
               {(() => {
                 const ph = formatPhoneDisplay(order.customer_phone);
                 return ph.text || "No phone";

@@ -101,6 +101,27 @@ export function getDelhiveryTrackingUrl(awb: string): string {
   return `https://www.delhivery.com/track-v2/package/${encodeURIComponent(awb.trim())}`;
 }
 
+export function getLabelUrl(
+  wbns: string | string[],
+  options?: { download?: boolean }
+): string {
+  const list = Array.isArray(wbns)
+    ? wbns.map((w) => w.trim()).filter(Boolean)
+    : [wbns.trim()].filter(Boolean);
+  const query = `wbns=${encodeURIComponent(list.join(","))}`;
+  return options?.download ? `/api/labels?${query}&download=1` : `/api/labels?${query}`;
+}
+
+export function triggerLabelDownload(wbns: string | string[]): void {
+  const url = getLabelUrl(wbns, { download: true });
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 export interface TransitInsights {
   stageIndex: number; // 0: Manifested, 1: In Transit, 2: Out for Delivery, 3: Delivered
   originLocation: string;

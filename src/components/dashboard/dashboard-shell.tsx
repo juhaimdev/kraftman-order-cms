@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { refreshWalletAction } from "@/actions/delhivery-ops";
@@ -18,7 +19,7 @@ import type {
   SalesSummary,
   WalletSummary,
 } from "@/lib/db/types";
-import { formatWalletINR } from "@/lib/utils";
+import { formatINR, formatWalletINR } from "@/lib/utils";
 import { BatchToolbar } from "@/components/desktop/batch-toolbar";
 import { OrdersTable } from "@/components/desktop/orders-table";
 import { SidePanel } from "@/components/desktop/side-panel";
@@ -31,7 +32,14 @@ import { ImportDelhiveryDialog } from "@/components/shared/import-delhivery-dial
 import { Button } from "@/components/ui/button";
 import { QuickFilters, type FilterKey } from "./quick-filters";
 import { SalesSummarySection } from "./sales-summary";
-import { Database, Inbox, Loader2, RefreshCw } from "lucide-react";
+import {
+  BarChart3,
+  ChevronRight,
+  Database,
+  Inbox,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 
 interface DashboardShellProps {
   orders: OrderWithShipment[];
@@ -423,7 +431,7 @@ export function DashboardShell({
         onSearchChange={setSearch}
       />
 
-      <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6 space-y-4">
+      <main className="mx-auto max-w-7xl px-3 py-3 sm:py-4 sm:px-6 space-y-3 sm:space-y-4 pb-32 md:pb-8">
         {!dbReady && (
           <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
             <Database className="h-5 w-5 shrink-0 text-amber-700 mt-0.5" />
@@ -463,14 +471,41 @@ export function DashboardShell({
           </div>
         )}
 
-        <SalesSummarySection
-          sales={sales}
-          wallet={wallet}
-          visibleOrders={orders}
-          isFiltered={filter !== "all" || Boolean(search.trim())}
-          onSelectFilter={handleFilterChange}
-          onRefreshWallet={handleRefreshWallet}
-        />
+        {/* Slim Mobile Sales CTA Banner -> /sales (keeps Orders above the fold) */}
+        <Link
+          href="/sales"
+          className="flex md:hidden min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-[#D9232A]/95 px-3.5 py-2.5 text-white shadow-xs active:scale-[0.99] transition-transform"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
+              <BarChart3 className="h-4 w-4 text-emerald-400" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium text-slate-300 truncate">
+                Total Sales · {sales.delivered_count} Delivered
+              </p>
+              <p className="font-mono text-sm font-bold text-white">
+                {formatINR(sales.total_revenue)}
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-white/15 px-2.5 py-1.5 text-[11px] font-semibold text-white">
+            Live Graphs
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
+
+        {/* Full Sales Summary Section on Tablet/Desktop */}
+        <div className="hidden md:block">
+          <SalesSummarySection
+            sales={sales}
+            wallet={wallet}
+            visibleOrders={orders}
+            isFiltered={filter !== "all" || Boolean(search.trim())}
+            onSelectFilter={handleFilterChange}
+            onRefreshWallet={handleRefreshWallet}
+          />
+        </div>
 
         <BatchToolbar
           selectedCount={selectedOrders.length}
@@ -578,15 +613,19 @@ export function DashboardShell({
         )}
       </main>
 
-      {/* Mobile Sticky Bottom Action Bar */}
+      {/* Mobile Sticky Bottom Action Bar + Navigation */}
       <BottomActionBar
         selectedCount={selectedOrders.length}
         unfulfilledSelectedCount={selectedUnfulfilled.length}
         manifestedSelectedCount={selectedWithAwb.length}
         trackingPending={trackingPending}
+        ndrCount={counts.ndr}
+        syncPending={syncAllPending}
         onGenerateAwb={handleGenerateAwbClick}
         onPrintLabels={handlePrintLabelsClick}
         onSyncTracking={handleSyncTrackingClick}
+        onSyncAll={handleSyncAllActive}
+        onClearSelection={() => setSelectedIds(new Set())}
       />
 
       {/* Mobile Bottom Sheet Drawer */}

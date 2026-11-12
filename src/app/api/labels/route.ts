@@ -1,5 +1,11 @@
 import { NextRequest, after } from "next/server";
+import { getOrdersByAwbs } from "@/lib/db/queries";
 import { fetchPackingSlip } from "@/lib/delhivery/client";
+import { getDefaultSellerAddressCached } from "@/lib/delhivery/one-mcp";
+import {
+  generateDelhiveryLabelPdf,
+  type ShippingLabelData,
+} from "@/lib/labels/delhivery-label-pdf";
 import {
   getLabelsBucketName,
   getSupabaseAdmin,
@@ -49,6 +55,8 @@ function extractPdfDownloadUrl(
 
 export async function GET(request: NextRequest) {
   const wbnsParam = request.nextUrl.searchParams.get("wbns")?.trim();
+  const isDownload = request.nextUrl.searchParams.get("download") === "1";
+  const dispositionType = isDownload ? "attachment" : "inline";
   if (!wbnsParam) {
     return Response.json(
       { error: "Missing required `wbns` query parameter" },
@@ -87,7 +95,7 @@ export async function GET(request: NextRequest) {
           status: 200,
           headers: {
             "Content-Type": "application/pdf",
-            "Content-Disposition": `inline; filename="delhivery-labels-${normalizedKey}.pdf"`,
+            "Content-Disposition": `${dispositionType}; filename="kraftman-label-${normalizedKey}.pdf"`,
             "Cache-Control": "private, max-age=86400",
             "X-Label-Cache": "HIT-SUPABASE",
           },
@@ -96,43 +104,99 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Fetch the official shipping label directly from Delhivery One Packing Slip API
-    const upstream = await fetchPackingSlip(wbns.join(","));
-    const contentType = upstream.headers.get("content-type") ?? "";
-    let pdfBytes: Uint8Array;
+    let pdfBytes: Uint8Array | null = null;
+    let isOfficialUpstream = false;
 
-    if (contentType.includes("application/pdf")) {
-      pdfBytes = new Uint8Array(await upstream.arrayBuffer());
-    } else {
-      const jsonBody = (await upstream.json().catch(() => ({}))) as Record<
-        string,
-        unknown
-      >;
-      const extracted = extractPdfDownloadUrl(jsonBody, wbns);
+    try {
+      const upstream = await fetchPackingSlip(wbns.join(","));
+      const contentType = upstream.headers.get("content-type") ?? "";
 
-      if (extracted.base64) {
-        pdfBytes = new Uint8Array(Buffer.from(extracted.base64, "base64"));
-      } else if (extracted.url) {
-        const pdfRes = await fetch(extracted.url, {
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (!pdfRes.ok) {
-          throw new Error(
-            `Delhivery label download URL returned HTTP ${pdfRes.status}`
-          );
-        }
-        pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
+      if (contentType.includes("application/pdf")) {
+        pdfBytes = new Uint8Array(await upstream.arrayBuffer());
+        isOfficialUpstream = true;
       } else {
-        throw new Error(
-          `Delhivery packing slip response did not contain an official PDF or pdf_download_link for ${wbns.join(", ")}.`
-        );
+        const jsonBody = (await upstream.json().catch(() => ({}))) as Record<
+          string,
+          unknown
+        >;
+        const extracted = extractPdfDownloadUrl(jsonBody, wbns);
+
+        if (extracted.base64) {
+          pdfBytes = new Uint8Array(Buffer.from(extracted.base64, "base64"));
+          isOfficialUpstream = true;
+        } else if (extracted.url) {
+          const pdfRes = await fetch(extracted.url, {
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (pdfRes.ok) {
+            pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
+            isOfficialUpstream = true;
+          }
+        }
       }
+    } catch {
+      // Upstream packing slip failed (e.g., 401 token or offline): fall back to Kraftman Delhivery 4x6 template
+    }
+
+    if (!pdfBytes) {
+      const [orders, sellerInfo] = await Promise.all([
+        getOrdersByAwbs(wbns),
+        getDefaultSellerAddressCached(),
+      ]);
+
+      const orderByAwb = new Map(
+        orders.map((o) => [o.awb_number ?? "", o])
+      );
+
+      const labelItems: ShippingLabelData[] = wbns.map((wbn) => {
+        const o = orderByAwb.get(wbn);
+        if (o) {
+          return {
+            awb: wbn,
+            orderNumber: o.order_number,
+            customerName: o.customer_name,
+            address: o.address,
+            city: o.city,
+            state: o.state,
+            pincode: o.pincode,
+            paymentMethod: o.payment_method,
+            totalAmount: o.total_amount,
+            itemDescription: o.item_description,
+            createdAt: o.created_at,
+            shippingMode: "Surface",
+            sellerName: sellerInfo.sellerName,
+            sellerAddress: sellerInfo.sellerAddress,
+            returnAddress: sellerInfo.sellerAddress,
+          };
+        }
+
+        return {
+          awb: wbn,
+          orderNumber: wbn.slice(-6),
+          customerName: "Valued Customer",
+          address: "Delivery Address",
+          city: "India",
+          state: "",
+          pincode: "000000",
+          paymentMethod: "Prepaid",
+          totalAmount: 0,
+          itemDescription: `Shipment ${wbn}`,
+          shippingMode: "Surface",
+          sellerName: sellerInfo.sellerName,
+          sellerAddress: sellerInfo.sellerAddress,
+          returnAddress: sellerInfo.sellerAddress,
+        };
+      });
+
+      pdfBytes = await generateDelhiveryLabelPdf(labelItems);
     }
 
     // 3. Cache official Delhivery label PDF into Supabase Storage non-blockingly via `after()`
-    if (supabase) {
+    if (supabase && isOfficialUpstream) {
+      const bytesToCache = pdfBytes;
       after(async () => {
         try {
-          await supabase.storage.from(bucket).upload(storagePath, pdfBytes, {
+          await supabase.storage.from(bucket).upload(storagePath, bytesToCache, {
             contentType: "application/pdf",
             upsert: true,
           });
@@ -155,9 +219,11 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="delhivery-labels-${normalizedKey}.pdf"`,
+        "Content-Disposition": `${dispositionType}; filename="kraftman-label-${normalizedKey}.pdf"`,
         "Cache-Control": "private, max-age=86400",
-        "X-Label-Cache": "OFFICIAL-DELHIVERY",
+        "X-Label-Cache": isOfficialUpstream
+          ? "OFFICIAL-DELHIVERY"
+          : "KRAFTMAN-DELHIVERY-4X6",
       },
     });
   } catch (err) {

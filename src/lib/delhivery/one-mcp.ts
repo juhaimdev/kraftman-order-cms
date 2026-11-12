@@ -171,3 +171,67 @@ export async function getWalletDetailsCached(
   return null;
 }
 
+export async function getDefaultSellerAddressCached(): Promise<{
+  sellerName: string;
+  sellerAddress: string;
+}> {
+  const fallback = {
+    sellerName: process.env.DELHIVERY_PICKUP_LOCATION?.trim() || "Kraftman",
+    sellerAddress:
+      "valiyapramba po nellikkaparamba mukkom , Thazhecode, Kerala, India, 673602",
+  };
+
+  const cfg = await getMcpConfig();
+  if (!cfg) return fallback;
+
+  const cacheKey = `d1mcp:seller-addr:${cfg.realm}`;
+  const cached = await cacheGet<{ sellerName: string; sellerAddress: string }>(
+    cacheKey
+  );
+  if (cached) return cached;
+
+  try {
+    const res = await callDelhiveryOneMcpTool<{
+      results?: Array<{
+        facility_name?: string;
+        address?: {
+          address_line1?: string;
+          address_line2?: string | null;
+          city?: string;
+          state?: string;
+          pin_code?: string;
+        };
+      }>;
+    }>("list-pickup-locations", {
+      search_on: ["facility_name"],
+      search_term: "",
+      page_size: 5,
+      page: 1,
+      field: "updated_at",
+      direction: "DESC",
+      op: "GTE",
+      value: "",
+      range_updated_at_op: "GTE",
+      range_updated_at_value: "",
+    });
+
+    const first = res?.results?.[0];
+    if (first?.address) {
+      const a = first.address;
+      const line = [a.address_line1, a.address_line2, a.city, a.state, "India", a.pin_code]
+        .filter(Boolean)
+        .join(", ");
+      const info = {
+        sellerName: first.facility_name || fallback.sellerName,
+        sellerAddress: line || fallback.sellerAddress,
+      };
+      await cachePut(cacheKey, info, 300);
+      return info;
+    }
+  } catch {
+    // Non-fatal fallback
+  }
+
+  return fallback;
+}
+

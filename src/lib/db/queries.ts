@@ -6,12 +6,15 @@ import {
 } from "../supabase/server";
 import type {
   CitySalesItem,
+  DailySalesPoint,
   DashboardCounts,
   OrderStatus,
   OrderWithShipment,
   PaymentMethod,
   ProductPreset,
+  SalesDashboardData,
   SalesSummary,
+  StateSalesItem,
   TrackingScan,
 } from "./types";
 
@@ -176,7 +179,7 @@ function computeAggregatesFallback(rows: SupabaseOrderRow[]): {
     } else if (row.status === "NDR") {
       ndrRevenue += amount;
       ndrCount++;
-    } else {
+    } else if (row.status !== "Cancelled") {
       inPipelineRevenue += amount;
       inPipelineCount++;
     }
@@ -519,5 +522,175 @@ export async function listProducts(): Promise<ProductPreset[]> {
     }));
   } catch {
     return [];
+  }
+}
+
+function toIstDateKey(isoStr: string): string {
+  const ts = Date.parse(isoStr);
+  const d = Number.isNaN(ts) ? new Date() : new Date(ts);
+  // Shift UTC -> IST (+05:30) cleanly without timezone-data edge cases
+  const ist = new Date(d.getTime() + 19_800_000);
+  return ist.toISOString().slice(0, 10);
+}
+
+function formatDayShort(dateKey: string): string {
+  const ts = Date.parse(`${dateKey}T00:00:00Z`);
+  if (Number.isNaN(ts)) return dateKey;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(new Date(ts));
+}
+
+export async function getSalesDashboardData(
+  days = 30
+): Promise<SalesDashboardData> {
+  const windowDays = Math.min(Math.max(days, 7), 90);
+  const updatedAt = new Date().toISOString();
+
+  if (!isSupabaseConfigured()) {
+    return {
+      sales: EMPTY_SALES,
+      counts: EMPTY_COUNTS,
+      dailySeries: [],
+      stateBreakdown: [],
+      deliveryRatePct: 0,
+      codSharePct: 0,
+      wallet: null,
+      dbReady: false,
+      dbReason: "missing_env",
+      updatedAt,
+    };
+  }
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return {
+      sales: EMPTY_SALES,
+      counts: EMPTY_COUNTS,
+      dailySeries: [],
+      stateBreakdown: [],
+      deliveryRatePct: 0,
+      codSharePct: 0,
+      wallet: null,
+      dbReady: false,
+      dbReason: "missing_env",
+      updatedAt,
+    };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .select(
+        "total_amount, payment_method, status, city, state, created_at, shipments(latest_tracking_status)"
+      )
+      .order("created_at", { ascending: false })
+      .limit(2000);
+
+    if (error) {
+      return {
+        sales: EMPTY_SALES,
+        counts: EMPTY_COUNTS,
+        dailySeries: [],
+        stateBreakdown: [],
+        deliveryRatePct: 0,
+        codSharePct: 0,
+        wallet: null,
+        dbReady: false,
+        dbReason: isMissingTableError(error) ? "missing_schema" : undefined,
+        updatedAt,
+      };
+    }
+
+    const rows = (data ?? []) as unknown as SupabaseOrderRow[];
+    const { counts, sales } = computeAggregatesFallback(rows);
+
+    // Build continuous daily series in IST for the requested day window
+    const nowIstMs = Date.now() + 19_800_000;
+    const dailyMap = new Map<string, DailySalesPoint>();
+    for (let i = windowDays - 1; i >= 0; i--) {
+      const dayKey = new Date(nowIstMs - i * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      dailyMap.set(dayKey, {
+        date: dayKey,
+        label: formatDayShort(dayKey),
+        revenue: 0,
+        orders: 0,
+        cod_revenue: 0,
+        prepaid_revenue: 0,
+        delivered: 0,
+        ndr: 0,
+      });
+    }
+
+    const stateMap = new Map<string, StateSalesItem>();
+
+    for (const r of rows) {
+      const amount = Number(r.total_amount ?? 0);
+      const dayKey = toIstDateKey(r.created_at);
+      const bucket = dailyMap.get(dayKey);
+      if (bucket && r.status !== "Cancelled") {
+        bucket.revenue += amount;
+        bucket.orders += 1;
+        if (r.payment_method === "COD") bucket.cod_revenue += amount;
+        else bucket.prepaid_revenue += amount;
+        if (r.status === "Delivered") bucket.delivered += 1;
+        if (r.status === "NDR") bucket.ndr += 1;
+      }
+
+      if (r.status !== "Cancelled") {
+        const stKey = r.state?.trim() || "Unspecified";
+        const st = stateMap.get(stKey) ?? {
+          state: stKey,
+          order_count: 0,
+          revenue: 0,
+        };
+        st.order_count += 1;
+        st.revenue += amount;
+        stateMap.set(stKey, st);
+      }
+    }
+
+    const activeOrders = sales.total_orders;
+    const deliveryRatePct =
+      activeOrders > 0
+        ? Math.round((sales.delivered_count / activeOrders) * 100)
+        : 0;
+    const codSharePct =
+      sales.total_revenue > 0
+        ? Math.round((sales.cod_revenue / sales.total_revenue) * 100)
+        : 0;
+
+    const stateBreakdown = Array.from(stateMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 6);
+
+    return {
+      sales,
+      counts,
+      dailySeries: Array.from(dailyMap.values()),
+      stateBreakdown,
+      deliveryRatePct,
+      codSharePct,
+      wallet: null,
+      dbReady: true,
+      updatedAt,
+    };
+  } catch {
+    return {
+      sales: EMPTY_SALES,
+      counts: EMPTY_COUNTS,
+      dailySeries: [],
+      stateBreakdown: [],
+      deliveryRatePct: 0,
+      codSharePct: 0,
+      wallet: null,
+      dbReady: false,
+      dbReason: "missing_schema",
+      updatedAt,
+    };
   }
 }
