@@ -10,6 +10,8 @@ import {
   getSupabaseAdmin,
 } from "@/lib/supabase/server";
 
+export const maxDuration = 30;
+
 export async function GET(request: NextRequest) {
   const wbnsParam = request.nextUrl.searchParams.get("wbns")?.trim();
   if (!wbnsParam) {
@@ -85,6 +87,10 @@ export async function GET(request: NextRequest) {
             (p) => String(p.wbn ?? p.waybill ?? "") === awb
           );
           const order = orderByAwb.get(awb);
+          const dims =
+            order?.length_cm && order?.width_cm && order?.height_cm
+              ? `${order.length_cm}x${order.width_cm}x${order.height_cm}`
+              : undefined;
           return {
             awb,
             orderNumber: String(pkg?.oid ?? order?.order_number ?? awb),
@@ -102,6 +108,9 @@ export async function GET(request: NextRequest) {
                 (order?.payment_method === "COD" ? order.total_amount : 0)
             ),
             weightGrams: String(order?.weight_grams ?? 500),
+            dimensions: dims,
+            itemDescription: order?.item_description ?? undefined,
+            pickupWarehouse: process.env.DELHIVERY_PICKUP_LOCATION?.trim() || undefined,
             sortCode: pkg?.sort_code ? String(pkg.sort_code) : undefined,
           };
         });
@@ -129,6 +138,13 @@ export async function GET(request: NextRequest) {
           paymentMode: o.payment_method,
           codAmount: o.payment_method === "COD" ? String(o.total_amount) : "0",
           weightGrams: String(o.weight_grams ?? 500),
+          dimensions:
+            o.length_cm && o.width_cm && o.height_cm
+              ? `${o.length_cm}x${o.width_cm}x${o.height_cm}`
+              : undefined,
+          itemDescription: o.item_description ?? undefined,
+          pickupWarehouse:
+            process.env.DELHIVERY_PICKUP_LOCATION?.trim() || undefined,
         }))
       );
     }

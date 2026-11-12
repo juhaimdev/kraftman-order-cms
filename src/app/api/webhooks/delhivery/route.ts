@@ -3,6 +3,8 @@ import type { TrackingScan } from "@/lib/db/types";
 import { normalizeDelhiveryStatus } from "@/lib/delhivery/normalize";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
+export const maxDuration = 30;
+
 interface DelhiveryWebhookPayload {
   Shipment?: {
     AWB?: string;

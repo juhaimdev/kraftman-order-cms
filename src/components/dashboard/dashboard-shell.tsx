@@ -15,8 +15,9 @@ import type {
   OrderWithShipment,
   ProductPreset,
   SalesSummary,
+  WalletSummary,
 } from "@/lib/db/types";
-import { formatINR } from "@/lib/utils";
+import { formatWalletINR } from "@/lib/utils";
 import { BatchToolbar } from "@/components/desktop/batch-toolbar";
 import { OrdersTable } from "@/components/desktop/orders-table";
 import { SidePanel } from "@/components/desktop/side-panel";
@@ -34,6 +35,7 @@ import { Database, Inbox, Loader2, RefreshCw } from "lucide-react";
 interface DashboardShellProps {
   orders: OrderWithShipment[];
   products: ProductPreset[];
+  wallet?: WalletSummary | null;
   counts: DashboardCounts;
   sales: SalesSummary;
   dbReady: boolean;
@@ -45,6 +47,7 @@ interface DashboardShellProps {
 export function DashboardShell({
   orders,
   products,
+  wallet: initialWallet = null,
   counts,
   sales,
   dbReady,
@@ -57,6 +60,7 @@ export function DashboardShell({
 
   const [filter, setFilter] = React.useState<FilterKey>(initialFilter);
   const [search, setSearch] = React.useState(initialQuery);
+  const [wallet, setWallet] = React.useState<WalletSummary | null>(initialWallet);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [activeOrderId, setActiveOrderId] = React.useState<string | null>(
     orders[0]?.id ?? null
@@ -335,8 +339,17 @@ export function DashboardShell({
       const mcpRes = await syncDelhiveryOneAction();
       if (!mcpRes.error && mcpRes.data) {
         const { syncedOrders, syncedShipments, walletBalance } = mcpRes.data;
+        if (typeof walletBalance === "number") {
+          setWallet((prev) => ({
+            current_balance: walletBalance,
+            minimum_threshold: prev?.minimum_threshold ?? 0,
+            maximum_threshold: prev?.maximum_threshold ?? 0,
+            is_active: prev?.is_active ?? true,
+            payment_gateway: prev?.payment_gateway,
+          }));
+        }
         const walletMsg =
-          walletBalance !== null ? ` · Wallet: ${formatINR(walletBalance)}` : "";
+          walletBalance !== null ? ` · Wallet: ${formatWalletINR(walletBalance)}` : "";
         toast.success(
           `Synced ${syncedOrders} order(s) & ${syncedShipments} shipment(s)${walletMsg}`
         );
@@ -361,6 +374,7 @@ export function DashboardShell({
         searchQuery={search}
         counts={counts}
         products={products}
+        wallet={wallet}
         exportUrl={exportUrl}
         syncAllPending={syncAllPending}
         trackAllPending={trackAllPending}
@@ -413,6 +427,7 @@ export function DashboardShell({
         {dbReady && (
           <SalesSummarySection
             sales={sales}
+            wallet={wallet}
             visibleOrders={orders}
             isFiltered={filter !== "all" || Boolean(search.trim())}
             onSelectFilter={handleFilterChange}

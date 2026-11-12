@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { listOrdersWithShipments } from "@/lib/db/queries";
 import { getDelhiveryTrackingUrl } from "@/lib/delhivery/tracking-link";
 
+export const maxDuration = 30;
+
 function csvCell(value: unknown): string {
   const str = String(value ?? "");
   if (/[",\n\r]/.test(str)) {

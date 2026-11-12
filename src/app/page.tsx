@@ -1,9 +1,11 @@
 import { Suspense } from "react";
 import { listOrdersWithShipments, listProducts } from "@/lib/db/queries";
+import { getWalletDetailsCached } from "@/lib/delhivery/one-mcp";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import type { FilterKey } from "@/components/dashboard/quick-filters";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 function normalizeFilter(raw?: string): FilterKey {
   if (raw === "pending" || raw === "ofd" || raw === "ndr") return raw;
@@ -19,16 +21,18 @@ async function OrdersFeed({
   const filter = normalizeFilter(params.filter);
   const query = params.q?.trim() ?? "";
 
-  const [{ orders, counts, sales, dbReady, dbReason }, products] =
+  const [{ orders, counts, sales, dbReady, dbReason }, products, wallet] =
     await Promise.all([
       listOrdersWithShipments({ filter, q: query }),
       listProducts(),
+      getWalletDetailsCached(),
     ]);
 
   return (
     <DashboardShell
       orders={orders}
       products={products}
+      wallet={wallet}
       counts={counts}
       sales={sales}
       dbReady={dbReady}
