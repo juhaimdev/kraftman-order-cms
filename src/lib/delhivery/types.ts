@@ -40,6 +40,7 @@ export interface DelhiveryShipmentInput {
   shipment_width: string;
   shipment_height: string;
   products_desc: string;
+  shipping_mode?: "Surface" | "Express";
 }
 
 export interface DelhiveryCreateResponse {

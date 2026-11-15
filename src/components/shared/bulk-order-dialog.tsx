@@ -168,6 +168,9 @@ export function BulkOrderDialog({
   ]);
   const [csvText, setCsvText] = React.useState("");
   const [autoManifest, setAutoManifest] = React.useState(true);
+  const [shippingMode, setShippingMode] = React.useState<"Surface" | "Express">(
+    "Surface"
+  );
   const [weightGrams, setWeightGrams] = React.useState("500");
   const [lengthCm, setLengthCm] = React.useState("20");
   const [widthCm, setWidthCm] = React.useState("15");
@@ -338,6 +341,7 @@ export function BulkOrderDialog({
           height: Number(heightCm) || 10,
         },
         productsDesc: desc,
+        shippingMode,
       });
 
       if (res.error) {
@@ -367,6 +371,7 @@ export function BulkOrderDialog({
           width: Number(widthCm) || 15,
           height: Number(heightCm) || 10,
         },
+        shippingMode,
       });
       if (res.error) {
         toast.error(res.error);
@@ -854,51 +859,94 @@ export function BulkOrderDialog({
               </label>
 
               {autoManifest && (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 pt-1">
-                  <label className="text-[11px] font-medium text-slate-600">
-                    Weight (g)
-                    <Input
-                      type="number"
-                      min={1}
-                      max={50000}
-                      value={weightGrams}
-                      onChange={(e) => setWeightGrams(e.target.value)}
-                      className="mt-1 h-9 font-mono text-xs bg-white"
-                    />
-                  </label>
-                  <label className="text-[11px] font-medium text-slate-600">
-                    Length (cm)
-                    <Input
-                      type="number"
-                      min={1}
-                      max={200}
-                      value={lengthCm}
-                      onChange={(e) => setLengthCm(e.target.value)}
-                      className="mt-1 h-9 font-mono text-xs bg-white"
-                    />
-                  </label>
-                  <label className="text-[11px] font-medium text-slate-600">
-                    Width (cm)
-                    <Input
-                      type="number"
-                      min={1}
-                      max={200}
-                      value={widthCm}
-                      onChange={(e) => setWidthCm(e.target.value)}
-                      className="mt-1 h-9 font-mono text-xs bg-white"
-                    />
-                  </label>
-                  <label className="text-[11px] font-medium text-slate-600">
-                    Height (cm)
-                    <Input
-                      type="number"
-                      min={1}
-                      max={200}
-                      value={heightCm}
-                      onChange={(e) => setHeightCm(e.target.value)}
-                      className="mt-1 h-9 font-mono text-xs bg-white"
-                    />
-                  </label>
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-slate-700">
+                      Delivery Type
+                    </span>
+                    <span className="text-[10px] font-semibold text-emerald-700">
+                      Default: Surface (Lowest Cost)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShippingMode("Surface")}
+                      className={cn(
+                        "flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-semibold transition-all cursor-pointer",
+                        shippingMode === "Surface"
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-1 ring-emerald-600/30 shadow-2xs"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      )}
+                    >
+                      <span>Surface (Ground)</span>
+                      <span className="rounded bg-emerald-700 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
+                        LOW COST
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShippingMode("Express")}
+                      className={cn(
+                        "flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-semibold transition-all cursor-pointer",
+                        shippingMode === "Express"
+                          ? "border-[#D9232A] bg-red-50 text-[#B71C22] ring-1 ring-[#D9232A]/30 shadow-2xs"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      )}
+                    >
+                      <span>Express (Air)</span>
+                      <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
+                        AIR
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 pt-1">
+                    <label className="text-[11px] font-medium text-slate-600">
+                      Weight (g)
+                      <Input
+                        type="number"
+                        min={1}
+                        max={50000}
+                        value={weightGrams}
+                        onChange={(e) => setWeightGrams(e.target.value)}
+                        className="mt-1 h-9 font-mono text-xs bg-white"
+                      />
+                    </label>
+                    <label className="text-[11px] font-medium text-slate-600">
+                      Length (cm)
+                      <Input
+                        type="number"
+                        min={1}
+                        max={200}
+                        value={lengthCm}
+                        onChange={(e) => setLengthCm(e.target.value)}
+                        className="mt-1 h-9 font-mono text-xs bg-white"
+                      />
+                    </label>
+                    <label className="text-[11px] font-medium text-slate-600">
+                      Width (cm)
+                      <Input
+                        type="number"
+                        min={1}
+                        max={200}
+                        value={widthCm}
+                        onChange={(e) => setWidthCm(e.target.value)}
+                        className="mt-1 h-9 font-mono text-xs bg-white"
+                      />
+                    </label>
+                    <label className="text-[11px] font-medium text-slate-600">
+                      Height (cm)
+                      <Input
+                        type="number"
+                        min={1}
+                        max={200}
+                        value={heightCm}
+                        onChange={(e) => setHeightCm(e.target.value)}
+                        className="mt-1 h-9 font-mono text-xs bg-white"
+                      />
+                    </label>
+                  </div>
                 </div>
               )}
             </div>

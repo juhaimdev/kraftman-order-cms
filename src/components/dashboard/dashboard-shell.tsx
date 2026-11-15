@@ -353,6 +353,7 @@ export function DashboardShell({
       productsDesc: preset.size_label
         ? `${preset.name} (${preset.size_label})`
         : preset.name,
+      shippingMode: "Surface",
     });
     setQuickShipPendingId(null);
 

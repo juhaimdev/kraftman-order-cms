@@ -65,6 +65,9 @@ export function AddOrderDialog({
   const [rateQuotes, setRateQuotes] = React.useState<ShippingRateQuote[]>([]);
   const [rateError, setRateError] = React.useState<string | null>(null);
   const [rateLoading, setRateLoading] = React.useState(false);
+  const [deliveryType, setDeliveryType] = React.useState<"Surface" | "Express">(
+    "Surface"
+  );
   const [bookedOrder, setBookedOrder] = React.useState<{
     id: string;
     orderNumber: string;
@@ -195,6 +198,7 @@ export function AddOrderDialog({
     setPinMsg(null);
     setRateQuotes([]);
     setRateError(null);
+    setDeliveryType("Surface");
   }
 
   function submitOrder(autoShip: boolean) {
@@ -232,6 +236,7 @@ export function AddOrderDialog({
             height: Math.max(1, Number(heightCm) || 10),
           },
           productsDesc: itemDescription || undefined,
+          shippingMode: deliveryType,
         });
 
         const awb = shipRes.data?.succeeded[0]?.awb;
@@ -295,6 +300,7 @@ export function AddOrderDialog({
           height: Math.max(1, Number(heightCm) || 10),
         },
         productsDesc: itemDescription || undefined,
+        shippingMode: deliveryType,
       });
       if (shipRes.error) {
         toast.error(shipRes.error);
@@ -588,6 +594,50 @@ export function AddOrderDialog({
             </label>
           </div>
 
+          {/* Delivery Type (Default: Surface - Low Cost Ground) */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-800">
+                Delivery Type
+              </span>
+              <span className="text-[10px] font-semibold text-emerald-700">
+                Default: Surface (Lowest Cost)
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setDeliveryType("Surface")}
+                className={cn(
+                  "flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-semibold transition-all cursor-pointer",
+                  deliveryType === "Surface"
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-1 ring-emerald-600/30 shadow-2xs"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                )}
+              >
+                <span>Surface (Ground)</span>
+                <span className="rounded bg-emerald-700 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
+                  LOW COST
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeliveryType("Express")}
+                className={cn(
+                  "flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-semibold transition-all cursor-pointer",
+                  deliveryType === "Express"
+                    ? "border-[#D9232A] bg-red-50 text-[#B71C22] ring-1 ring-[#D9232A]/30 shadow-2xs"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                )}
+              >
+                <span>Express (Air)</span>
+                <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
+                  AIR
+                </span>
+              </button>
+            </div>
+          </div>
+
           {/* Package Weight & Dimensions for Live Shipping Cost Preview */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2.5">
             <div className="flex items-center justify-between gap-2">
@@ -672,36 +722,20 @@ export function AddOrderDialog({
               </p>
             ) : rateQuotes.length > 0 ? (
               <div className="grid grid-cols-2 gap-2">
-                {expressQuote && (
-                  <div className="rounded-lg border border-red-200 bg-white px-2.5 py-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="rounded bg-[#D9232A] px-1.5 py-0.5 text-[9px] font-bold text-white">
-                        EXPRESS
-                      </span>
-                      <span className="font-mono text-[10px] text-slate-500">
-                        Zone {expressQuote.zone} · {expressQuote.charged_weight}g
-                      </span>
-                    </div>
-                    <p className="mt-1 font-mono text-sm font-bold text-slate-950">
-                      ₹{expressQuote.total_amount.toFixed(2)}
-                    </p>
-                    <p className="text-[10px] text-slate-500">
-                      Net after ship:{" "}
-                      <strong className="text-emerald-700">
-                        ₹
-                        {(
-                          (Number(totalAmount) || 0) -
-                          expressQuote.total_amount
-                        ).toFixed(2)}
-                      </strong>
-                    </p>
-                  </div>
-                )}
                 {surfaceQuote && (
-                  <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryType("Surface")}
+                    className={cn(
+                      "text-left rounded-lg border p-2.5 text-xs transition-all cursor-pointer",
+                      deliveryType === "Surface"
+                        ? "border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-600/30 shadow-xs"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    )}
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                        SURFACE
+                      <span className="rounded bg-emerald-700 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
+                        SURFACE · LOW COST
                       </span>
                       <span className="font-mono text-[10px] text-slate-500">
                         Zone {surfaceQuote.zone} · {surfaceQuote.charged_weight}g
@@ -720,7 +754,51 @@ export function AddOrderDialog({
                         ).toFixed(2)}
                       </strong>
                     </p>
-                  </div>
+                    <div className="mt-1 text-[10px] font-semibold text-emerald-800">
+                      {deliveryType === "Surface"
+                        ? "✓ Selected (Default)"
+                        : "Click to select"}
+                    </div>
+                  </button>
+                )}
+                {expressQuote && (
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryType("Express")}
+                    className={cn(
+                      "text-left rounded-lg border p-2.5 text-xs transition-all cursor-pointer",
+                      deliveryType === "Express"
+                        ? "border-[#D9232A] bg-red-50/80 ring-2 ring-[#D9232A]/30 shadow-xs"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
+                        EXPRESS · AIR
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-500">
+                        Zone {expressQuote.zone} · {expressQuote.charged_weight}g
+                      </span>
+                    </div>
+                    <p className="mt-1 font-mono text-sm font-bold text-slate-950">
+                      ₹{expressQuote.total_amount.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      Net after ship:{" "}
+                      <strong className="text-emerald-700">
+                        ₹
+                        {(
+                          (Number(totalAmount) || 0) -
+                          expressQuote.total_amount
+                        ).toFixed(2)}
+                      </strong>
+                    </p>
+                    <div className="mt-1 text-[10px] font-semibold text-slate-600">
+                      {deliveryType === "Express"
+                        ? "✓ Selected"
+                        : "Click to select"}
+                    </div>
+                  </button>
                 )}
               </div>
             ) : rateError ? (
@@ -728,7 +806,7 @@ export function AddOrderDialog({
             ) : (
               <p className={cn("text-[11px] text-slate-500")}>
                 Enter a 6-digit customer PIN code above to auto-calculate live
-                Delhivery Express &amp; Surface courier cost before booking.
+                Delhivery Surface (Low Cost) &amp; Express courier cost before booking.
               </p>
             )}
           </div>

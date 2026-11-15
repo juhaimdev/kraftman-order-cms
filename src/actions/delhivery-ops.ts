@@ -130,7 +130,7 @@ export async function calculateShippingRatesAction(
 
   const v = parsed.data;
   const paymentMode = v.payment_method === "COD" ? "COD" : "PREPAID";
-  const modes: Array<"EXPRESS" | "SURFACE"> = ["EXPRESS", "SURFACE"];
+  const modes: Array<"SURFACE" | "EXPRESS"> = ["SURFACE", "EXPRESS"];
 
   const responses = await Promise.all(
     modes.map((mode) =>

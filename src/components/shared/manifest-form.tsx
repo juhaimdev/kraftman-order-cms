@@ -61,6 +61,9 @@ export function ManifestForm({
         ? `${initialProduct.name}${initialProduct.size_label ? ` (${initialProduct.size_label})` : ""}`
         : "")
   );
+  const [shippingMode, setShippingMode] = React.useState<"Surface" | "Express">(
+    "Surface"
+  );
   const [quotes, setQuotes] = React.useState<ShippingRateQuote[]>([]);
   const [rateLoading, setRateLoading] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
@@ -110,6 +113,7 @@ export function ManifestForm({
           height: params.height,
         },
         productsDesc: params.desc,
+        shippingMode,
       });
 
       if (res.error) {
@@ -249,6 +253,50 @@ export function ManifestForm({
         </div>
       )}
 
+      {/* Delivery Type Select: Default Surface (Low Cost Ground) */}
+      <div className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-semibold text-slate-700">
+            Delivery Type
+          </span>
+          <span className="text-[10px] font-semibold text-emerald-700">
+            Default: Surface (Lowest Cost)
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setShippingMode("Surface")}
+            className={cn(
+              "flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-all cursor-pointer",
+              shippingMode === "Surface"
+                ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-1 ring-emerald-600/30 shadow-2xs"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            )}
+          >
+            <span>Surface (Ground)</span>
+            <span className="rounded bg-emerald-700 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
+              LOW COST
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShippingMode("Express")}
+            className={cn(
+              "flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-all cursor-pointer",
+              shippingMode === "Express"
+                ? "border-[#D9232A] bg-red-50 text-[#B71C22] ring-1 ring-[#D9232A]/30 shadow-2xs"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            )}
+          >
+            <span>Express (Air)</span>
+            <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
+              AIR
+            </span>
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
           Weight (g)
@@ -321,20 +369,50 @@ export function ManifestForm({
           </div>
           {quotes.length > 0 && (
             <div className="grid grid-cols-2 gap-2">
-              {quotes.map((q) => (
-                <div
-                  key={q.mode}
-                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px]"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900">{q.mode}</span>
-                    <span className="font-mono text-slate-500">Zone {q.zone}</span>
-                  </div>
-                  <p className="font-mono text-sm font-bold text-slate-950">
-                    ₹{q.total_amount.toFixed(2)}
-                  </p>
-                </div>
-              ))}
+              {quotes.map((q) => {
+                const isSelected =
+                  (q.mode === "SURFACE" && shippingMode === "Surface") ||
+                  (q.mode === "EXPRESS" && shippingMode === "Express");
+                return (
+                  <button
+                    key={q.mode}
+                    type="button"
+                    onClick={() =>
+                      setShippingMode(q.mode === "SURFACE" ? "Surface" : "Express")
+                    }
+                    className={cn(
+                      "text-left rounded-md border p-2 text-[11px] transition-all cursor-pointer",
+                      isSelected
+                        ? q.mode === "SURFACE"
+                          ? "border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-600/30"
+                          : "border-[#D9232A] bg-red-50/70 ring-1 ring-[#D9232A]/30"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                          q.mode === "SURFACE"
+                            ? "bg-emerald-700 text-white"
+                            : "bg-slate-800 text-white"
+                        )}
+                      >
+                        {q.mode === "SURFACE" ? "SURFACE · LOW COST" : q.mode}
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-500">
+                        Zone {q.zone}
+                      </span>
+                    </div>
+                    <p className="mt-1 font-mono text-sm font-extrabold text-slate-950">
+                      ₹{q.total_amount.toFixed(2)}
+                    </p>
+                    <span className="text-[10px] font-semibold text-slate-600 mt-0.5 block">
+                      {isSelected ? "✓ Selected" : "Click to select"}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -351,7 +429,7 @@ export function ManifestForm({
         ) : (
           <PackagePlus className="h-4 w-4" />
         )}
-        <span>{submitLabel ?? "Generate AWB & Manifest"}</span>
+        <span>{submitLabel ?? `Generate AWB & Manifest (${shippingMode})`}</span>
       </Button>
     </form>
   );

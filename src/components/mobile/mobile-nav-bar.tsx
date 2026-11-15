@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Loader2, Package, RefreshCw } from "lucide-react";
+import { BarChart3, Loader2, Package, RefreshCw, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UsersDialog } from "@/components/shared/users-dialog";
 
 interface MobileNavBarProps {
   ndrCount?: number;
@@ -26,7 +27,7 @@ export function MobileNavBar({
       aria-label="Mobile app navigation"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-md md:hidden pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(15,23,42,0.06)]"
     >
-      <div className="grid grid-cols-3 gap-1 px-2 py-1.5">
+      <div className="grid grid-cols-4 gap-1 px-1.5 py-1.5">
         <Link
           href="/"
           className={cn(
@@ -57,8 +58,20 @@ export function MobileNavBar({
           )}
         >
           <BarChart3 className="h-4.5 w-4.5" />
-          <span>Sales &amp; Graphs</span>
+          <span>Sales</span>
         </Link>
+
+        <UsersDialog
+          trigger={
+            <button
+              type="button"
+              className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
+            >
+              <Users className="h-4.5 w-4.5 text-slate-700" />
+              <span>Team</span>
+            </button>
+          }
+        />
 
         <button
           type="button"

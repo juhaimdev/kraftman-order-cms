@@ -739,9 +739,9 @@ export function OperationsHubDialog({
                   <div
                     key={q.mode}
                     className={cn(
-                      "rounded-xl border p-4 space-y-2.5",
-                      q.mode === "EXPRESS"
-                        ? "border-red-200 bg-red-50/30"
+                      "rounded-xl border p-4 space-y-2.5 shadow-2xs",
+                      q.mode === "SURFACE"
+                        ? "border-emerald-300 bg-emerald-50/40 ring-1 ring-emerald-600/20"
                         : "border-slate-200 bg-white"
                     )}
                   >
@@ -749,12 +749,12 @@ export function OperationsHubDialog({
                       <span
                         className={cn(
                           "rounded px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider",
-                          q.mode === "EXPRESS"
-                            ? "bg-[#D9232A] text-white"
+                          q.mode === "SURFACE"
+                            ? "bg-emerald-700 text-white"
                             : "bg-slate-800 text-white"
                         )}
                       >
-                        {q.mode}
+                        {q.mode === "SURFACE" ? "SURFACE · LOW COST" : "EXPRESS · AIR"}
                       </span>
                       <span className="font-mono text-xs font-semibold text-slate-600">
                         Zone {q.zone} · {q.charged_weight}g billable

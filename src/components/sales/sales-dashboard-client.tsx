@@ -22,6 +22,8 @@ import type { ProductPreset, SalesDashboardData } from "@/lib/db/types";
 import { cn, formatINR, formatWalletINR } from "@/lib/utils";
 import { MobileNavBar } from "@/components/mobile/mobile-nav-bar";
 import { RateCalculatorDialog } from "@/components/shared/rate-calculator-dialog";
+import { UserProfileMenu } from "@/components/shared/user-profile-menu";
+import { UsersDialog } from "@/components/shared/users-dialog";
 import { Button } from "@/components/ui/button";
 import {
   FulfillmentFunnelChart,
@@ -168,6 +170,8 @@ export function SalesDashboardClient({
             </button>
 
             <RateCalculatorDialog products={products} />
+            <UsersDialog />
+            <UserProfileMenu />
 
             <Button
               type="button"

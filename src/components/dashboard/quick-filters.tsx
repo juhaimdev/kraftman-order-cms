@@ -26,6 +26,8 @@ import { ImportDelhiveryDialog } from "@/components/shared/import-delhivery-dial
 import { OperationsHubDialog } from "@/components/shared/operations-hub-dialog";
 import { ProductsDialog } from "@/components/shared/products-dialog";
 import { RateCalculatorDialog } from "@/components/shared/rate-calculator-dialog";
+import { UserProfileMenu } from "@/components/shared/user-profile-menu";
+import { UsersDialog } from "@/components/shared/users-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -165,6 +167,9 @@ export function QuickFilters({
               </span>
             </button>
 
+            {/* Current Logged In User Pill & Menu */}
+            <UserProfileMenu />
+
             <AddOrderDialog products={products} />
           </div>
         </div>
@@ -196,6 +201,7 @@ export function QuickFilters({
             <BulkOrderDialog products={products} />
             <RateCalculatorDialog products={products} />
             <OperationsHubDialog orders={orders} ndrCount={counts.ndr} />
+            <UsersDialog />
             <ProductsDialog products={products} />
 
             {onTrackAll && (

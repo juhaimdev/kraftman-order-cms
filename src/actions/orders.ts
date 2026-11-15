@@ -180,6 +180,7 @@ export async function createBulkOrdersAction(
       weightGrams: input.weightGrams ?? 500,
       dimensions: input.dimensions ?? { length: 20, width: 15, height: 10 },
       productsDesc: input.productsDesc,
+      shippingMode: input.shippingMode ?? "Surface",
     });
 
     if (!manifestConfigParsed.success) {
@@ -196,6 +197,7 @@ export async function createBulkOrdersAction(
           height: 10,
         },
         productsDesc: input.productsDesc,
+        shippingMode: manifestConfigParsed.data.shippingMode ?? "Surface",
       });
 
       if (shipRes.error) {

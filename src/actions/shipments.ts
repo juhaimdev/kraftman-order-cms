@@ -44,7 +44,13 @@ export async function createShipmentsAction(
     };
   }
 
-  const { orderIds, weightGrams, dimensions, productsDesc } = parsed.data;
+  const {
+    orderIds,
+    weightGrams,
+    dimensions,
+    productsDesc,
+    shippingMode = "Surface",
+  } = parsed.data;
 
   try {
     const [ordersRes, existingRes] = await Promise.all([
@@ -118,6 +124,7 @@ export async function createShipmentsAction(
         shipment_length: String(dimensions.length),
         shipment_width: String(dimensions.width),
         shipment_height: String(dimensions.height),
+        shipping_mode: shippingMode,
         products_desc:
           o.item_description?.trim() ||
           productsDesc?.trim() ||
@@ -148,7 +155,7 @@ export async function createShipmentsAction(
             ScanDateTime: new Date().toISOString(),
             ScanType: "UD",
             Scan: "Manifested",
-            Instructions: "Shipment manifested via Delhivery One API",
+            Instructions: `Shipment manifested via Delhivery One (${shippingMode})`,
             ScannedLocation: "Seller Warehouse",
           },
         ];

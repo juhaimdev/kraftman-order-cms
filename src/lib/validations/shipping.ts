@@ -32,6 +32,7 @@ export const createShipmentsSchema = z.object({
   weightGrams: weightSchema,
   dimensions: dimensionSchema,
   productsDesc: z.string().trim().max(120).optional(),
+  shippingMode: z.enum(["Surface", "Express"]).default("Surface"),
 });
 
 export const ndrUpdateSchema = z
@@ -156,6 +157,7 @@ export const bulkCreateOrdersSchema = z.object({
   weightGrams: weightSchema.optional(),
   dimensions: dimensionSchema.optional(),
   productsDesc: z.string().trim().max(120).optional(),
+  shippingMode: z.enum(["Surface", "Express"]).default("Surface"),
 });
 
 export type CreateShipmentsInput = z.infer<typeof createShipmentsSchema>;
