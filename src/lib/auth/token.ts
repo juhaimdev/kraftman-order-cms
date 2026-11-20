@@ -164,3 +164,7 @@ export async function verifyPin(pin: string, storedHash: string): Promise<boolea
   }
   return diff === 0;
 }
+
+export const hashPassword = hashPin;
+export const verifyPassword = verifyPin;
+

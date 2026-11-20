@@ -7,7 +7,6 @@ import {
   getSession,
   setSessionCookie,
   signSessionToken,
-  verifyPin,
 } from "@/lib/auth/session";
 import type { SessionUser, User } from "@/lib/auth/types";
 import {
@@ -16,12 +15,19 @@ import {
   findUserByUsernameWithPin,
   listUsers,
   toggleUserStatus,
+  verifyUserPassword,
 } from "@/lib/auth/users-repo";
 
-const loginSchema = z.object({
-  username: z.string().min(1, "Please enter your username").max(50),
-  pin: z.string().min(4, "PIN must be at least 4 digits").max(20),
-});
+const loginSchema = z
+  .object({
+    username: z.string().min(1, "Please enter your username").max(50),
+    password: z.string().max(100).optional(),
+    pin: z.string().max(100).optional(),
+  })
+  .refine((data) => Boolean((data.password && data.password.length > 0) || (data.pin && data.pin.length > 0)), {
+    message: "Please enter your password",
+    path: ["password"],
+  });
 
 export async function loginAction(
   rawInput: unknown
@@ -34,13 +40,15 @@ export async function loginAction(
     };
   }
 
-  const { username, pin } = parsed.data;
+  const { username } = parsed.data;
+  const candidatePass = (parsed.data.password || parsed.data.pin || "").trim();
+
   const user = await findUserByUsernameWithPin(username);
 
   if (!user) {
     return {
       success: false,
-      error: "Invalid username or PIN",
+      error: "Invalid username or password",
     };
   }
 
@@ -51,11 +59,11 @@ export async function loginAction(
     };
   }
 
-  const isPinMatch = await verifyPin(pin, user.pin_hash);
-  if (!isPinMatch) {
+  const isMatch = await verifyUserPassword(user, candidatePass);
+  if (!isMatch) {
     return {
       success: false,
-      error: "Invalid username or PIN",
+      error: "Invalid username or password",
     };
   }
 
@@ -105,7 +113,8 @@ const createUserSchema = z.object({
     .max(30)
     .regex(/^[a-zA-Z0-9_-]+$/, "Letters, numbers, underscores and hyphens only"),
   name: z.string().min(2, "Full name must be at least 2 characters").max(60),
-  pin: z.string().min(4, "PIN must be at least 4 digits").max(16),
+  password: z.string().max(60).optional(),
+  pin: z.string().max(60).optional(),
   role: z.enum(["admin", "operator"]).default("operator"),
 });
 
@@ -125,7 +134,17 @@ export async function createUserAction(
     };
   }
 
-  const result = await createUser(parsed.data);
+  const cleanUsername = parsed.data.username.toLowerCase().trim();
+  // If password is not provided or empty, use the username as the password
+  const passwordToUse = (parsed.data.password || parsed.data.pin || cleanUsername).trim();
+
+  const result = await createUser({
+    username: cleanUsername,
+    name: parsed.data.name.trim(),
+    password: passwordToUse,
+    role: parsed.data.role,
+  });
+
   if (result.error || !result.user) {
     return { success: false, error: result.error || "Failed to create user" };
   }

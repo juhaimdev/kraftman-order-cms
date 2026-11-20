@@ -107,7 +107,7 @@ export function UserProfileMenu({ initialUser }: UserProfileMenuProps) {
                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 cursor-pointer text-left"
                 >
                   <Users className="h-4 w-4 text-[#D9232A]" />
-                  <span>Manage Team &amp; PINs</span>
+                  <span>Manage Team &amp; Users</span>
                 </button>
               }
             />

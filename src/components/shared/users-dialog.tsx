@@ -2,6 +2,9 @@
 
 import * as React from "react";
 import {
+  Check,
+  Eye,
+  EyeOff,
   Loader2,
   Lock,
   Plus,
@@ -46,7 +49,9 @@ export function UsersDialog({ trigger }: UsersDialogProps) {
   // Form State
   const [fullName, setFullName] = React.useState("");
   const [username, setUsername] = React.useState("");
-  const [pin, setPin] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [useSameAsUsername, setUseSameAsUsername] = React.useState(true);
+  const [showPassword, setShowPassword] = React.useState(false);
   const [role, setRole] = React.useState<UserRole>("operator");
   const [formError, setFormError] = React.useState<string | null>(null);
   const [isSubmitting, startSubmit] = React.useTransition();
@@ -80,24 +85,30 @@ export function UsersDialog({ trigger }: UsersDialogProps) {
     e.preventDefault();
     setFormError(null);
 
-    if (!fullName.trim() || fullName.trim().length < 2) {
+    const cleanName = fullName.trim();
+    const cleanUsername = username.toLowerCase().trim();
+
+    if (!cleanName || cleanName.length < 2) {
       setFormError("Full name must be at least 2 characters");
       return;
     }
-    if (!username.trim() || username.trim().length < 3) {
+    if (!cleanUsername || cleanUsername.length < 3) {
       setFormError("Username must be at least 3 characters");
       return;
     }
-    if (!pin.trim() || pin.trim().length < 4) {
-      setFormError("PIN must be at least 4 digits");
+
+    const finalPassword = useSameAsUsername || !password.trim() ? cleanUsername : password.trim();
+
+    if (finalPassword.length < 3) {
+      setFormError("Password must be at least 3 characters");
       return;
     }
 
     startSubmit(async () => {
       const res = await createUserAction({
-        name: fullName,
-        username,
-        pin,
+        name: cleanName,
+        username: cleanUsername,
+        password: finalPassword,
         role,
       });
 
@@ -107,11 +118,17 @@ export function UsersDialog({ trigger }: UsersDialogProps) {
         return;
       }
 
-      toast.success(`User "${username}" created successfully with PIN!`);
+      toast.success(
+        `User "${cleanUsername}" created successfully! Password: ${
+          useSameAsUsername || !password.trim() ? "same as username" : "set"
+        }`
+      );
+
       // Reset form
       setFullName("");
       setUsername("");
-      setPin("");
+      setPassword("");
+      setUseSameAsUsername(true);
       setRole("operator");
       setActiveTab("list");
       await loadUsers();
@@ -172,7 +189,7 @@ export function UsersDialog({ trigger }: UsersDialogProps) {
                   Team &amp; User Access
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500">
-                  Manage operators, PINs, and permissions for Kraftman Command Center
+                  Manage operators, passwords, and permissions for Kraftman Command Center
                 </DialogDescription>
               </div>
             </div>
@@ -290,7 +307,7 @@ export function UsersDialog({ trigger }: UsersDialogProps) {
 
                         {/* Actions */}
                         <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
-                          {!isSelf && (
+                          {!isSelf && user.username !== "admin" && (
                             <>
                               <Button
                                 type="button"
@@ -380,56 +397,78 @@ export function UsersDialog({ trigger }: UsersDialogProps) {
                       onChange={(e) =>
                         setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))
                       }
-                      placeholder="e.g. arun_ops"
+                      placeholder="e.g. arun"
                       className="pl-8 h-9 text-xs font-mono"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="new-pin"
-                    className="block text-xs font-semibold text-slate-700"
-                  >
-                    Security PIN (4-8 digits)
+              {/* Password Option: Username & Password Same */}
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-800">
+                    Password Setup
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => setUseSameAsUsername(!useSameAsUsername)}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#D9232A] hover:underline cursor-pointer"
+                  >
+                    {useSameAsUsername ? "Set custom password" : "Make password same as username"}
+                  </button>
+                </div>
+
+                {useSameAsUsername ? (
+                  <div className="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 font-medium">
+                    <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+                    <span>
+                      Password will be identical to username:{" "}
+                      <code className="bg-emerald-100 px-1 py-0.5 rounded font-mono font-bold">
+                        {username || "username"}
+                      </code>
+                    </span>
+                  </div>
+                ) : (
                   <div className="relative">
                     <Lock className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                     <Input
-                      id="new-pin"
-                      required
-                      type="password"
-                      inputMode="numeric"
-                      value={pin}
-                      onChange={(e) => setPin(e.target.value)}
-                      placeholder="e.g. 5678"
-                      className="pl-8.5 h-9 text-xs font-mono tracking-wider"
+                      id="new-password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter custom password"
+                      className="pl-8.5 pr-8 h-9 text-xs"
                     />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
                   </div>
-                  <p className="text-[10px] text-slate-400">
-                    Used to sign in from mobile or warehouse terminal
-                  </p>
-                </div>
+                )}
+              </div>
 
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="new-role"
-                    className="block text-xs font-semibold text-slate-700"
-                  >
-                    Role &amp; Permissions
-                  </label>
-                  <select
-                    id="new-role"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value as UserRole)}
-                    className="w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#D9232A]/20"
-                  >
-                    <option value="operator">Operator (Shipments &amp; Manifests)</option>
-                    <option value="admin">Administrator (Full Access &amp; User Management)</option>
-                  </select>
-                </div>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="new-role"
+                  className="block text-xs font-semibold text-slate-700"
+                >
+                  Role &amp; Permissions
+                </label>
+                <select
+                  id="new-role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  className="w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#D9232A]/20"
+                >
+                  <option value="operator">Operator (Shipments, Orders &amp; Manifests)</option>
+                  <option value="admin">Administrator (Full Access &amp; Team Management)</option>
+                </select>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">

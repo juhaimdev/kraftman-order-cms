@@ -12,6 +12,8 @@ export interface User {
 
 export interface UserWithPinHash extends User {
   pin_hash: string;
+  password_hash?: string;
+  alt_hash?: string; // secondary hash (e.g. allows both 'admin' and '1234' for default admin)
 }
 
 export interface SessionUser {
